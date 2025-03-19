@@ -23,20 +23,61 @@ Sistema de procesamiento de extractos bancarios y actualización a Google Sheets
    cd Contable
    ```
 
-2. Instalar las dependencias:
+2. Crear y activar un entorno virtual (recomendado):
+   
+   En Windows:
+   ```
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+   
+   En macOS/Linux:
+   ```
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Instalar las dependencias:
    ```
    pip install -r requirements.txt
    ```
+   
+   Si tienes problemas con la instalación de pandas, puedes instalarlo directamente:
+   ```
+   pip install pandas
+   ```
 
-3. Configurar el acceso a Google Sheets:
+4. Verificar la instalación:
+   ```
+   python -c "import pandas; print(pandas.__version__)"
+   ```
+
+5. Configurar el acceso a Google Sheets:
    - Crear un proyecto en [Google Cloud Console](https://console.cloud.google.com/)
    - Habilitar la API de Google Sheets
    - Crear una cuenta de servicio y generar una clave en formato JSON
    - Guardar el archivo de credenciales en `config/credentials.json`
    - Compartir la hoja de cálculo con el email de la cuenta de servicio
 
-4. Configurar el archivo `config/settings.json`:
+6. Configurar el archivo `config/settings.json`:
    - Añadir el ID de la hoja de Google Sheets
+
+## Resolución de problemas
+
+### Error "Unable to import pandas"
+
+Si encuentras este error en tu IDE o al ejecutar lint:
+
+1. Asegúrate de que estás utilizando el intérprete de Python del entorno virtual donde instalaste pandas
+2. Verifica la instalación con: `pip list | grep pandas`
+3. Reinstala pandas si es necesario: `pip install --upgrade --force-reinstall pandas`
+4. Si usas VS Code, selecciona el intérprete correcto con `Ctrl+Shift+P` → "Python: Select Interpreter"
+
+### Problemas con Google Sheets
+
+1. Verifica que el archivo `credentials.json` sea válido y esté en la ubicación correcta
+2. Asegúrate de que la cuenta de servicio tenga permisos para acceder a la hoja de cálculo
+3. Confirma que el ID de la hoja en `settings.json` sea correcto
 
 ## Uso
 
