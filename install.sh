@@ -21,9 +21,13 @@ python3 -m virtualenv venv
 echo "Activando entorno virtual..."
 source venv/bin/activate
 
+# Instalar setuptools primero
+echo "Instalando setuptools..."
+pip install setuptools
+
 # Instalar dependencias
 echo "Instalando dependencias..."
-pip install -e .
+pip install -r requirements.txt
 
 # Verificar instalación
 echo "Verificando instalación de pandas..."

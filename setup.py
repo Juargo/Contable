@@ -1,4 +1,15 @@
-from setuptools import setup, find_packages
+""" Archivo de configuración de setuptools para instalar el paquete contable. """
+
+try:
+    from setuptools import setup, find_packages
+except ImportError:
+    print("ERROR: setuptools no está instalado.")
+    print("Por favor, instala setuptools primero:")
+    print("pip install setuptools")
+    print("\nAlternativamente, puedes instalar las dependencias directamente:")
+    print("pip install -r requirements.txt")
+    import sys
+    sys.exit(1)
 
 setup(
     name="contable",

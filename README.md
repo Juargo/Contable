@@ -17,13 +17,28 @@ Sistema de procesamiento de extractos bancarios y actualización a Google Sheets
 
 ## Instalación
 
+### Opción 1: Usando scripts de instalación
+
+#### En Windows:
+```
+install.bat
+```
+
+#### En macOS/Linux:
+```
+chmod +x install.sh
+./install.sh
+```
+
+### Opción 2: Instalación manual con entorno virtual
+
 1. Clonar el repositorio:
    ```
    git clone https://github.com/tu-usuario/Contable.git
    cd Contable
    ```
 
-2. Crear y activar un entorno virtual (recomendado):
+2. Crear y activar un entorno virtual:
    
    En Windows:
    ```
@@ -37,41 +52,63 @@ Sistema de procesamiento de extractos bancarios y actualización a Google Sheets
    source venv/bin/activate
    ```
 
-3. Instalar las dependencias:
+3. Instalar setuptools primero:
+   ```
+   pip install setuptools
+   ```
+
+4. Instalar las dependencias:
    ```
    pip install -r requirements.txt
    ```
-   
-   Si tienes problemas con la instalación de pandas, puedes instalarlo directamente:
-   ```
-   pip install pandas
-   ```
 
-4. Verificar la instalación:
-   ```
-   python -c "import pandas; print(pandas.__version__)"
-   ```
+### Opción 3: Instalación directa sin setuptools
 
-5. Configurar el acceso a Google Sheets:
+Si tienes problemas con setuptools, puedes usar la instalación directa:
+
+```
+python install_direct.py
+```
+
+## Verificación de la instalación
+
+Verifica que pandas esté correctamente instalado:
+
+```
+python -c "import pandas; print(pandas.__version__)"
+```
+
+## Configuración
+
+1. Configurar el acceso a Google Sheets:
    - Crear un proyecto en [Google Cloud Console](https://console.cloud.google.com/)
    - Habilitar la API de Google Sheets
    - Crear una cuenta de servicio y generar una clave en formato JSON
    - Guardar el archivo de credenciales en `config/credentials.json`
    - Compartir la hoja de cálculo con el email de la cuenta de servicio
 
-6. Configurar el archivo `config/settings.json`:
+2. Configurar el archivo `config/settings.json`:
    - Añadir el ID de la hoja de Google Sheets
 
 ## Resolución de problemas
 
-### Error "Unable to import pandas"
+### Error "Unable to import 'setuptools'" o "Unable to import 'pandas'"
 
-Si encuentras este error en tu IDE o al ejecutar lint:
+Estos errores indican que algunos módulos no están instalados correctamente:
 
-1. Asegúrate de que estás utilizando el intérprete de Python del entorno virtual donde instalaste pandas
-2. Verifica la instalación con: `pip list | grep pandas`
-3. Reinstala pandas si es necesario: `pip install --upgrade --force-reinstall pandas`
-4. Si usas VS Code, selecciona el intérprete correcto con `Ctrl+Shift+P` → "Python: Select Interpreter"
+1. Instala directamente estos paquetes:
+   ```
+   pip install setuptools pandas
+   ```
+
+2. Si usas un IDE como VS Code o PyCharm, configura el intérprete:
+   - VS Code: `Ctrl+Shift+P` → "Python: Select Interpreter" → selecciona el entorno virtual
+   - PyCharm: File → Settings → Project → Python Interpreter → selecciona o añade el intérprete
+
+3. Usa la instalación directa:
+   ```
+   python install_direct.py
+   ```
 
 ### Problemas con Google Sheets
 
