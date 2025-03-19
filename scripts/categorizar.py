@@ -121,13 +121,51 @@ def obtener_mes_anio(fecha):
         logger.error("Error al procesar fecha '%s': %s", fecha, e)
         return "Desconocido", None
 
-def agrupar_por_mes_categoria(movimientos, categorias=None):
+def es_cargo(monto, banco=None):
+    """
+    Determina si un monto representa un cargo/costo basado en su valor y posiblemente el banco.
+    
+    Args:
+        monto: El monto a evaluar
+        banco (str, optional): El nombre del banco si está disponible
+        
+    Returns:
+        bool: True si es un cargo, False en caso contrario
+    """
+    try:
+        # Convertir a número si es string
+        if isinstance(monto, str):
+            # Eliminar símbolos y formateo
+            monto_limpio = monto.replace("$", "").replace(".", "").replace(",", ".")
+            monto = float(monto_limpio)
+        else:
+            monto = float(monto)
+        
+        # Diferentes bancos pueden usar diferentes formatos para los cargos
+        if banco:
+            banco = banco.lower()
+            # En BCI, los cargos podrían ser positivos
+            if banco == "bci":
+                return monto != 0  # Consideramos cualquier valor diferente de cero como cargo
+            # Para otros bancos, los cargos generalmente son negativos
+            else:
+                return monto < 0
+        else:
+            # Por defecto, asumimos que los cargos son negativos
+            return monto < 0
+    except (ValueError, TypeError):
+        # Si no podemos convertir a número, no podemos determinar si es cargo
+        logger.warning("No se pudo determinar si '%s' es un cargo", monto)
+        return False
+
+def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True):
     """
     Agrupa los movimientos por mes y categoría.
     
     Args:
         movimientos (list): Lista de movimientos
         categorias (dict, optional): Diccionario de categorías. Si es None, se carga del archivo.
+        solo_cargos (bool): Si solo se deben considerar los movimientos de cargo/costo
         
     Returns:
         dict: Diccionario con estructura {mes: {categoria: total}}
@@ -140,16 +178,14 @@ def agrupar_por_mes_categoria(movimientos, categorias=None):
     
     # Procesar cada movimiento
     for mov in movimientos:
-        # Obtener mes y año
-        fecha = mov.get("Fecha")
-        if not fecha:
-            mes_anio, fecha_dt = "Desconocido", None
-        else:
-            mes_anio, fecha_dt = obtener_mes_anio(fecha)
-        
         # Obtener descripción y monto
         descripcion = mov.get("Descripción", mov.get("Detalle", ""))
         monto = mov.get("Cargo", 0)
+        banco = mov.get("Banco")  # Algunos movimientos podrían tener el banco identificado
+        
+        # Si solo queremos considerar cargos, verificar si este movimiento es un cargo
+        if solo_cargos and not es_cargo(monto, banco):
+            continue
         
         # Convertir monto a número si es string
         if isinstance(monto, str):
@@ -161,8 +197,16 @@ def agrupar_por_mes_categoria(movimientos, categorias=None):
                 logger.warning("No se pudo convertir el monto '%s' a número", monto)
                 monto = 0
         
-        # Tomar valor absoluto del monto (los cargos suelen ser negativos)
+        # Tomar valor absoluto del monto para calcular totales
+        # (los cargos suelen ser negativos pero queremos mostrar totales positivos)
         monto = abs(float(monto))
+        
+        # Obtener mes y año
+        fecha = mov.get("Fecha")
+        if not fecha:
+            mes_anio, fecha_dt = "Desconocido", None
+        else:
+            mes_anio, fecha_dt = obtener_mes_anio(fecha)
         
         # Categorizar el movimiento
         categoria = categorizar_movimiento(descripcion, categorias)
@@ -186,16 +230,17 @@ def agrupar_por_mes_categoria(movimientos, categorias=None):
     logger.info("Movimientos agrupados por mes y categoría: %d meses", len(agrupado))
     return agrupado
 
-def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False):
+def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos=True):
     """
     Muestra un resumen de gastos categorizados y agrupados por mes.
     
     Args:
         movimientos (list): Lista de movimientos
         mostrar_detalle (bool): Si se debe mostrar el detalle de movimientos por categoría
+        solo_cargos (bool): Si solo se deben considerar los movimientos de cargo/costo
     """
     categorias = cargar_categorias()
-    agrupado = agrupar_por_mes_categoria(movimientos, categorias)
+    agrupado = agrupar_por_mes_categoria(movimientos, categorias, solo_cargos)
     
     # Ordenar meses cronológicamente
     # Usamos una clave personalizada: primero por fecha si está disponible, luego alfabéticamente
@@ -280,7 +325,7 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False):
     
     print("\n" + "="*60)
 
-def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"):
+def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen", solo_cargos=True):
     """
     Exporta el resumen categorizado a Google Sheets.
     
@@ -288,6 +333,7 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
         movimientos (list): Lista de movimientos
         gsheet_id (str, optional): ID de la hoja de Google Sheets
         nombre_hoja (str): Nombre de la hoja donde se exportará el resumen
+        solo_cargos (bool): Si solo se deben considerar los movimientos de cargo/costo
         
     Returns:
         bool: True si la exportación fue exitosa, False en caso contrario
@@ -296,7 +342,7 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
         from scripts.actualizar_gsheet import conectar_gsheet
         
         categorias = cargar_categorias()
-        agrupado = agrupar_por_mes_categoria(movimientos, categorias)
+        agrupado = agrupar_por_mes_categoria(movimientos, categorias, solo_cargos)
         
         # Ordenar meses cronológicamente (misma función que en mostrar_resumen_categorizado)
         def clave_ordenamiento(mes):

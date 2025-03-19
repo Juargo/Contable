@@ -151,7 +151,12 @@ Estos errores indican que algunos módulos no están instalados correctamente:
    python run.py --categorizar
    ```
 
-8. Para combinar opciones:
+8. Para incluir todos los movimientos, no solo los cargos:
+   ```
+   python run.py --categorizar --todos-movimientos
+   ```
+
+9. Para combinar opciones:
    ```
    python run.py --banco bancoestado --solo-mostrar --categorizar
    ```
@@ -159,6 +164,8 @@ Estos errores indican que algunos módulos no están instalados correctamente:
 ## Categorización de gastos
 
 El sistema incluye un diccionario de categorías en `config/categorias.json` que permite clasificar automáticamente los gastos según palabras clave en la descripción de los movimientos.
+
+Por defecto, la categorización solo considera los movimientos que representan cargos o costos (valores negativos), ignorando abonos y transferencias recibidas. Esto se puede modificar con la opción `--todos-movimientos`.
 
 ### Personalizar categorías
 
@@ -180,10 +187,11 @@ Puedes editar el archivo `config/categorias.json` para ajustar las categorías y
 Al usar la opción `--categorizar`, el sistema:
 
 1. Procesa todos los archivos Excel encontrados
-2. Clasifica cada movimiento en una categoría según las palabras clave
-3. Agrupa los movimientos por mes y categoría
-4. Muestra un resumen en la consola con los totales por categoría en cada mes
-5. Opcionalmente exporta el resumen a una hoja en Google Sheets
+2. Filtra los movimientos para considerar solo los cargos (a menos que se use `--todos-movimientos`)
+3. Clasifica cada movimiento en una categoría según las palabras clave
+4. Agrupa los movimientos por mes y categoría
+5. Muestra un resumen en la consola con los totales por categoría en cada mes
+6. Opcionalmente exporta el resumen a una hoja en Google Sheets
 
 ## Bancos soportados
 
