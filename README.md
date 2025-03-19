@@ -6,12 +6,14 @@ Sistema de procesamiento de extractos bancarios y actualización a Google Sheets
 
 - Procesa archivos Excel de diferentes bancos (BancoEstado, BancoChile, BancoSantander, BCI)
 - Extrae saldos y movimientos específicos de cada formato
+- Muestra un resumen formateado de los datos en la consola
 - Actualiza automáticamente una hoja de Google Sheets con los datos procesados
+- Sistema de logs detallado para depuración
 
 ## Requisitos
 
 - Python 3.6 o superior
-- Bibliotecas: pandas, openpyxl, gspread, oauth2client
+- Bibliotecas: pandas, openpyxl, gspread, oauth2client, prettytable
 
 ## Instalación
 
@@ -53,6 +55,16 @@ Sistema de procesamiento de extractos bancarios y actualización a Google Sheets
 4. Para especificar un directorio diferente:
    ```
    python run.py --directorio mi_directorio
+   ```
+
+5. Para solo mostrar los datos sin actualizar Google Sheets:
+   ```
+   python run.py --solo-mostrar
+   ```
+
+6. Para ver logs detallados (modo depuración):
+   ```
+   python run.py --debug
    ```
 
 ## Bancos soportados

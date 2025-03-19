@@ -1,6 +1,18 @@
 import pandas as pd
 import argparse
 import os
+import logging
+import sys
+
+# Configuración de logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger('contable')
 
 def extraer_datos(archivo):
     # Identificar el banco según el nombre del archivo
@@ -40,51 +52,104 @@ def extraer_datos_bancoestado(archivo):
 
 def extraer_datos_bancochile(archivo):
     try:
+        logger.info(f"Iniciando procesamiento de archivo Banco Chile: {archivo}")
+        
         # Cargar el archivo Excel
         xls = pd.ExcelFile(archivo)
+        logger.info(f"Hojas encontradas en el archivo: {xls.sheet_names}")
+
         sheet_name = xls.sheet_names[0]
+        logger.info(f"Usando hoja: {sheet_name}")
+        
         df = pd.read_excel(xls, sheet_name=sheet_name)
+        logger.debug(f"Dimensiones del DataFrame: {df.shape}")
+        logger.debug(f"Primeras 5 filas:\n{df.head()}")
+        
+        # Variables para seguimiento
+        saldo_disponible = None
+        header_row = None
         
         # Buscar la fila que contiene "Saldo disponible"
+        logger.info("Buscando información de 'Saldo disponible'...")
         for i, row in df.iterrows():
             for j, cell in enumerate(row):
+                logger.debug(f"Fila {i}, Columna {j}, Valor: {cell}")
                 if isinstance(cell, str) and "Saldo disponible" in cell:
                     saldo_disponible = df.iloc[i, j+1]  # El valor está en la columna siguiente
+                    logger.info(f"Saldo disponible encontrado en fila {i}, columna {j+1}: {saldo_disponible}")
                     break
+        
+        if saldo_disponible is None:
+            logger.warning("No se encontró 'Saldo disponible' en el archivo")
         
         # Identificar la tabla de movimientos
         # Buscamos la fila que contiene los encabezados
-        header_row = None
+        logger.info("Buscando encabezados de tabla de movimientos...")
         for i, row in df.iterrows():
-            for cell in row:
+            row_str = ' '.join([str(cell) for cell in row if isinstance(cell, str)])
+            logger.debug(f"Fila {i}, Contenido: {row_str}")
+            
+            for j, cell in enumerate(row):
                 if isinstance(cell, str) and "Fecha" in cell:
                     header_row = i
+                    logger.info(f"Encabezado de tabla encontrado en fila {i}")
+                    logger.debug(f"Encabezados: {[str(h) for h in df.iloc[i]]}")
                     break
+            
             if header_row is not None:
                 break
         
         # Extraer los movimientos
         if header_row is not None:
+            logger.info(f"Extrayendo movimientos desde la fila {header_row+1}")
             df_movimientos = df.iloc[header_row+1:].copy()
             df_movimientos.columns = df.iloc[header_row]
+            
+            logger.debug(f"Columnas disponibles: {list(df_movimientos.columns)}")
             
             # Seleccionamos las columnas de interés
             columns_interest = ["Fecha", "Descripción", "Cargo"]
             existing_columns = [col for col in columns_interest if col in df_movimientos.columns]
-            df_movimientos = df_movimientos[existing_columns]
             
-            # Filtrar solo cargos (valores negativos o columna específica)
-            if "Cargo" in df_movimientos.columns:
-                df_movimientos = df_movimientos[pd.to_numeric(df_movimientos["Cargo"], errors='coerce') < 0]
+            logger.info(f"Columnas seleccionadas: {existing_columns}")
             
-            # Convertir DataFrame a lista de diccionarios
-            movimientos = df_movimientos.to_dict(orient="records")
+            if existing_columns:
+                df_movimientos = df_movimientos[existing_columns]
+                
+                # Filtrar solo cargos (valores negativos o columna específica)
+                if "Cargo" in df_movimientos.columns:
+                    # Mostrar ejemplos de valores en la columna Cargo
+                    cargo_examples = df_movimientos["Cargo"].head(10).tolist()
+                    logger.debug(f"Ejemplos de valores en columna Cargo: {cargo_examples}")
+                    
+                    # Intentar convertir a numérico y filtrar
+                    df_movimientos["Cargo_num"] = pd.to_numeric(df_movimientos["Cargo"], errors='coerce')
+                    filtered_df = df_movimientos[df_movimientos["Cargo_num"] < 0]
+                    
+                    logger.info(f"Registros antes del filtrado: {len(df_movimientos)}")
+                    logger.info(f"Registros después del filtrado de cargos negativos: {len(filtered_df)}")
+                    
+                    df_movimientos = filtered_df
+                    df_movimientos = df_movimientos.drop("Cargo_num", axis=1, errors="ignore")
+                
+                # Convertir DataFrame a lista de diccionarios
+                movimientos = df_movimientos.to_dict(orient="records")
+                logger.info(f"Total de movimientos encontrados: {len(movimientos)}")
+                
+                # Mostrar ejemplos de movimientos
+                if movimientos:
+                    logger.debug(f"Ejemplo de primer movimiento: {movimientos[0]}")
+            else:
+                logger.warning("No se encontraron las columnas de interés en los datos")
+                movimientos = []
         else:
+            logger.warning("No se encontraron encabezados de tabla en el archivo")
             movimientos = []
         
+        logger.info(f"Procesamiento de Banco Chile completado. Saldo: {saldo_disponible}, Movimientos: {len(movimientos)}")
         return saldo_disponible, movimientos
     except Exception as e:
-        print(f"Error al procesar archivo de BancoChile: {e}")
+        logger.error(f"Error al procesar archivo de Banco Chile: {e}", exc_info=True)
         return 0, []
 
 def extraer_datos_santander(archivo):
