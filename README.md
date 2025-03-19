@@ -9,6 +9,7 @@ Sistema de procesamiento de extractos bancarios y actualización a Google Sheets
 - Muestra un resumen formateado de los datos en la consola
 - Actualiza automáticamente una hoja de Google Sheets con los datos procesados
 - Sistema de logs detallado para depuración
+- Categorización automática de gastos por mes y tipo de gasto
 
 ## Requisitos
 
@@ -144,6 +145,45 @@ Estos errores indican que algunos módulos no están instalados correctamente:
    ```
    python run.py --debug
    ```
+
+7. Para categorizar gastos y ver un resumen por mes y categoría:
+   ```
+   python run.py --categorizar
+   ```
+
+8. Para combinar opciones:
+   ```
+   python run.py --banco bancoestado --solo-mostrar --categorizar
+   ```
+
+## Categorización de gastos
+
+El sistema incluye un diccionario de categorías en `config/categorias.json` que permite clasificar automáticamente los gastos según palabras clave en la descripción de los movimientos.
+
+### Personalizar categorías
+
+Puedes editar el archivo `config/categorias.json` para ajustar las categorías y palabras clave según tus necesidades. El formato es:
+
+```json
+{
+  "Nombre de categoría": [
+    "PALABRA_CLAVE1",
+    "PALABRA_CLAVE2",
+    ...
+  ],
+  ...
+}
+```
+
+### Resumen categorizado
+
+Al usar la opción `--categorizar`, el sistema:
+
+1. Procesa todos los archivos Excel encontrados
+2. Clasifica cada movimiento en una categoría según las palabras clave
+3. Agrupa los movimientos por mes y categoría
+4. Muestra un resumen en la consola con los totales por categoría en cada mes
+5. Opcionalmente exporta el resumen a una hoja en Google Sheets
 
 ## Bancos soportados
 

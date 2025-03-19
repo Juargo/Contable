@@ -6,6 +6,7 @@ import json
 from scripts.procesar_excel import extraer_datos
 from scripts.actualizar_gsheet import actualizar_movimientos
 from scripts.mostrar_datos import mostrar_resumen_datos
+from scripts.categorizar import mostrar_resumen_categorizado, exportar_resumen_a_gsheet
 from scripts.utils.logger import setup_logger, enable_debug
 
 # Configurar logger
@@ -49,7 +50,7 @@ def crear_configuracion_inicial():
     print("Por favor, edite el archivo y agregue su ID de Google Spreadsheet")
 
 
-def procesar_archivos(directorio, banco=None, solo_mostrar=False):
+def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=False):
     """Procesa los archivos Excel del directorio y actualiza Google Sheets"""
     config = cargar_configuracion()
     if not solo_mostrar and not config.get("spreadsheet_id"):
@@ -76,6 +77,9 @@ def procesar_archivos(directorio, banco=None, solo_mostrar=False):
         return
 
     logger.info("Iniciando procesamiento de %d archivos en %s", len(archivos), directorio)
+
+    # Variables para acumular todos los movimientos si se solicita categorización
+    todos_movimientos = []
 
     # Filtrar archivos por banco si se especifica
     for archivo in archivos:
@@ -105,6 +109,10 @@ def procesar_archivos(directorio, banco=None, solo_mostrar=False):
             logger.info("Procesando archivo: %s (Banco: %s)", archivo, banco_detectado)
             saldo, movimientos = extraer_datos(ruta_completa)
 
+            # Acumular movimientos para categorización
+            if categorizar:
+                todos_movimientos.extend(movimientos)
+
             # Mostrar los datos procesados en pantalla
             mostrar_resumen_datos(banco_detectado, saldo, movimientos)
 
@@ -122,6 +130,15 @@ def procesar_archivos(directorio, banco=None, solo_mostrar=False):
 
         except (FileNotFoundError, ValueError, KeyError) as e:
             logger.error("Error al procesar %s: %s", archivo, e, exc_info=True)
+
+    # Mostrar resumen categorizado si se solicita
+    if categorizar and todos_movimientos:
+        logger.info("Generando resumen categorizado de %d movimientos", len(todos_movimientos))
+        mostrar_resumen_categorizado(todos_movimientos)
+
+        # Si no es solo mostrar, también exportar el resumen a Google Sheets
+        if not solo_mostrar and config.get("spreadsheet_id"):
+            exportar_resumen_a_gsheet(todos_movimientos, nombre_hoja="Resumen_Categorizado")
 
 
 if __name__ == "__main__":
@@ -149,6 +166,10 @@ if __name__ == "__main__":
         help="Solo mostrar los datos procesados sin actualizar Google Sheets",
     )
     parser.add_argument(
+        "--categorizar", "-c", action="store_true",
+        help="Categoriza los gastos y genera un resumen por mes y categoría"
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Activa el modo debug con logs detallados"
     )
 
@@ -170,4 +191,4 @@ if __name__ == "__main__":
         )
 
     # Procesar archivos
-    procesar_archivos(directorio_absoluto, args.banco, args.solo_mostrar)
+    procesar_archivos(directorio_absoluto, args.banco, args.solo_mostrar, args.categorizar)
