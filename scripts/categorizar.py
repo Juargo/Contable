@@ -75,6 +75,75 @@ def crear_diccionario_predeterminado():
     
     logger.info("Archivo de categorías predeterminado creado en %s", ruta_categorias)
 
+def cargar_palabras_descartar():
+    """Carga la lista de palabras clave para descartar movimientos."""
+    try:
+        ruta_descartar = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'config', 'descartar.json'
+        )
+        with open(ruta_descartar, 'r', encoding='utf-8') as f:
+            config_descartar = json.load(f)
+        
+        palabras_descartar = config_descartar.get('palabras_clave', [])
+        logger.info("Lista de palabras a descartar cargada: %d palabras", len(palabras_descartar))
+        return palabras_descartar
+    except FileNotFoundError:
+        logger.warning("Archivo de palabras a descartar no encontrado. Creando uno predeterminado.")
+        crear_archivo_descartar_predeterminado()
+        return cargar_palabras_descartar()
+    except json.JSONDecodeError:
+        logger.error("Error al leer el archivo de palabras a descartar. Formato JSON inválido.")
+        return []
+
+def crear_archivo_descartar_predeterminado():
+    """Crea un archivo predeterminado con palabras clave a descartar."""
+    config_predeterminado = {
+        "palabras_clave": [
+            "TRANSFERENCIA ENVIADA A JORGE RETAMA"
+        ],
+        "comentarios": {
+            "TRANSFERENCIA ENVIADA A JORGE RETAMA": "Transferencia entre cuentas propias"
+        }
+    }
+    
+    ruta_config = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
+    if not os.path.exists(ruta_config):
+        os.makedirs(ruta_config)
+        
+    ruta_descartar = os.path.join(ruta_config, 'descartar.json')
+    with open(ruta_descartar, 'w', encoding='utf-8') as f:
+        json.dump(config_predeterminado, f, indent=2, ensure_ascii=False)
+    
+    logger.info("Archivo de palabras a descartar predeterminado creado en %s", ruta_descartar)
+
+def debe_descartarse(descripcion, palabras_descartar=None):
+    """
+    Determina si un movimiento debe descartarse según su descripción.
+    
+    Args:
+        descripcion (str): Descripción del movimiento
+        palabras_descartar (list, optional): Lista de palabras clave para descartar
+        
+    Returns:
+        bool: True si el movimiento debe descartarse, False en caso contrario
+    """
+    if not descripcion or not isinstance(descripcion, str):
+        return False
+    
+    if palabras_descartar is None:
+        palabras_descartar = cargar_palabras_descartar()
+    
+    descripcion = descripcion.upper()
+    
+    # Verificar si alguna palabra clave está en la descripción
+    for palabra in palabras_descartar:
+        if palabra.upper() in descripcion:
+            logger.debug("Movimiento '%s' descartado por palabra clave '%s'", 
+                        descripcion, palabra)
+            return True
+    
+    return False
+
 def categorizar_movimiento(descripcion, categorias):
     """
     Asigna una categoría y subcategoría a un movimiento basado en su descripción.
@@ -249,6 +318,9 @@ def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True, me
     if categorias is None:
         categorias = cargar_categorias()
     
+    # Cargar palabras a descartar
+    palabras_descartar = cargar_palabras_descartar()
+    
     # Inicializar diccionario para agrupar resultados
     agrupado = {}
     
@@ -256,6 +328,11 @@ def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True, me
     for mov in movimientos:
         # Obtener descripción y monto
         descripcion = mov.get("Descripción", mov.get("Detalle", ""))
+        
+        # Verificar si se debe descartar este movimiento
+        if debe_descartarse(descripcion, palabras_descartar):
+            continue
+            
         monto = mov.get("Cargo", 0)
         banco = mov.get("Banco")  # Algunos movimientos podrían tener el banco identificado
         
@@ -396,10 +473,10 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
             
             # Añadir fila de la categoría principal
             tabla.add_row([
-                f"**{categoria}**",
+                f"{categoria.upper()}",
                 "",
-                f"**${total_categoria:,.2f}**",
-                f"**{total_movimientos_categoria}**"
+                f"${total_categoria:,.0f}**",
+                f"{total_movimientos_categoria}"
             ])
             
             # Añadir subcategorías
@@ -412,7 +489,7 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
                     tabla.add_row([
                         "",
                         subcategoria,
-                        f"${total_subcategoria:,.2f}",
+                        f"${total_subcategoria:,.0f}",
                         num_movimientos
                     ])
                     
@@ -433,7 +510,7 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
                             tabla_detalle.add_row([
                                 fecha,
                                 desc[:50],
-                                f"${monto:,.2f}"
+                                f"${monto:,.f}"
                             ])
                         
                         print(tabla_detalle)
@@ -445,7 +522,7 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
         tabla.add_row([
             "TOTAL",
             "",
-            f"${total_mes:,.2f}",
+            f"${total_mes:,.0f}",
             total_movimientos_mes
         ])
         

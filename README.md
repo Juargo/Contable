@@ -198,6 +198,30 @@ El sistema utiliza un esquema jerárquico con categorías y subcategorías. Pued
 3. Si no encuentra ninguna coincidencia, asigna "Otros - General"
 4. El valor de cada categoría principal es la suma de todas sus subcategorías
 
+### Descartar movimientos específicos
+
+El sistema permite descartar movimientos específicos basados en palabras clave, como transferencias entre cuentas propias u otros movimientos que no quieras considerar en tu análisis. Para esto:
+
+1. Edita el archivo `config/descartar.json`
+2. Agrega las palabras clave en el arreglo `palabras_clave`
+3. Opcionalmente añade comentarios para cada palabra clave en la sección `comentarios`
+
+Ejemplo:
+```json
+{
+  "palabras_clave": [
+    "TRANSFERENCIA ENVIADA A JORGE RETAMA",
+    "TRANSFERENCIA RECIBIDA DE JORGE RETAMA"
+  ],
+  "comentarios": {
+    "TRANSFERENCIA ENVIADA A JORGE RETAMA": "Transferencia entre cuentas propias",
+    "TRANSFERENCIA RECIBIDA DE JORGE RETAMA": "Transferencia entre cuentas propias"
+  }
+}
+```
+
+Cualquier movimiento que contenga alguna de estas palabras clave será excluido automáticamente de los análisis y resúmenes.
+
 ### Migración desde versión anterior
 
 Si vienes de una versión anterior del sistema sin subcategorías, puedes migrar tu archivo de categorías ejecutando:

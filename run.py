@@ -50,7 +50,7 @@ def crear_configuracion_inicial():
     print("Por favor, edite el archivo y agregue su ID de Google Spreadsheet")
 
 
-def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=False, solo_cargos=True, mes_en_curso=False):
+def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=False, solo_cargos=True, mes_en_curso=False, mostrar_descartados=False):
     """Procesa los archivos Excel del directorio y actualiza Google Sheets"""
     config = cargar_configuracion()
     if not solo_mostrar and not config.get("spreadsheet_id"):
@@ -80,6 +80,7 @@ def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=Fa
 
     # Variables para acumular todos los movimientos si se solicita categorización
     todos_movimientos = []
+    movimientos_descartados = []
 
     # Filtrar archivos por banco si se especifica
     for archivo in archivos:
@@ -144,6 +145,45 @@ def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=Fa
         if not solo_mostrar and config.get("spreadsheet_id"):
             exportar_resumen_a_gsheet(todos_movimientos, nombre_hoja="Resumen_Categorizado", solo_cargos=solo_cargos, mes_en_curso=mes_en_curso)
 
+    # Mostrar los movimientos descartados si se solicita
+    if mostrar_descartados and movimientos_descartados:
+        from scripts.categorizar import debe_descartarse, cargar_palabras_descartar
+        
+        palabras_descartar = cargar_palabras_descartar()
+        descartados = []
+        
+        for mov in todos_movimientos:
+            descripcion = mov.get("Descripción", mov.get("Detalle", ""))
+            if debe_descartarse(descripcion, palabras_descartar):
+                descartados.append(mov)
+        
+        if descartados:
+            logger.info("Movimientos descartados: %d", len(descartados))
+            print("\n" + "="*60)
+            print("MOVIMIENTOS DESCARTADOS POR PALABRAS CLAVE")
+            print("="*60)
+            
+            from prettytable import PrettyTable
+            tabla = PrettyTable()
+            tabla.field_names = ["Fecha", "Descripción", "Monto", "Palabra clave"]
+            tabla.align["Descripción"] = "l"
+            
+            for mov in descartados:
+                fecha = mov.get("Fecha", "")
+                desc = mov.get("Descripción", mov.get("Detalle", ""))
+                monto = mov.get("Cargo", 0)
+                
+                # Identificar qué palabra clave causó el descarte
+                palabra_encontrada = "Desconocida"
+                for palabra in palabras_descartar:
+                    if palabra.upper() in desc.upper():
+                        palabra_encontrada = palabra
+                        break
+                
+                tabla.add_row([fecha, desc[:50], monto, palabra_encontrada])
+            
+            print(tabla)
+            print("\n" + "="*60)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -184,6 +224,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--debug", action="store_true", help="Activa el modo debug con logs detallados"
     )
+    parser.add_argument(
+        "--mostrar-descartados", "-D", action="store_true",
+        help="Muestra los movimientos descartados por palabras clave"
+    )
 
     args = parser.parse_args()
 
@@ -203,4 +247,12 @@ if __name__ == "__main__":
         )
 
     # Procesar archivos
-    procesar_archivos(directorio_absoluto, args.banco, args.solo_mostrar, args.categorizar, args.solo_cargos, args.mes_en_curso)
+    procesar_archivos(
+        directorio_absoluto, 
+        args.banco, 
+        args.solo_mostrar, 
+        args.categorizar, 
+        args.solo_cargos, 
+        args.mes_en_curso,
+        args.mostrar_descartados
+    )
