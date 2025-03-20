@@ -20,11 +20,31 @@ def mostrar_resumen_datos(banco, saldo, movimientos):
     else:
         print("\nSaldo no disponible")
     
-    # Mostrar resumen de movimientos
-    print(f"\nTotal de movimientos (cargos) encontrados: {len(movimientos)}")
+    # Filtrar movimientos con cargo cero o nulo
+    movimientos_validos = []
+    for mov in movimientos:
+        cargo = mov.get("Cargo", 0)
+        if cargo is None:
+            continue
+        
+        try:
+            if isinstance(cargo, str):
+                cargo = cargo.replace("$", "").replace(".", "").replace(",", ".")
+                cargo = float(cargo)
+            
+            if cargo == 0:
+                continue
+                
+            movimientos_validos.append(mov)
+        except (ValueError, TypeError):
+            # Si no podemos convertir a número, omitimos el movimiento
+            continue
     
-    if movimientos:
-        total_cargos = sum(float(mov.get("Cargo", 0)) for mov in movimientos 
+    # Mostrar resumen de movimientos
+    print(f"\nTotal de movimientos (cargos) encontrados: {len(movimientos_validos)}")
+    
+    if movimientos_validos:
+        total_cargos = sum(float(mov.get("Cargo", 0)) for mov in movimientos_validos 
                           if isinstance(mov.get("Cargo"), (int, float)) or 
                           (isinstance(mov.get("Cargo"), str) and mov.get("Cargo").replace('-', '').replace(',', '').replace('.', '').isdigit()))
         print(f"Suma total de cargos: ${total_cargos:,.2f}")
@@ -47,7 +67,7 @@ def mostrar_resumen_datos(banco, saldo, movimientos):
         tabla.max_width = 40
         
         # Añadir filas a la tabla
-        for mov in movimientos[:10]:  # Mostrar solo los primeros 10 para no saturar la consola
+        for mov in movimientos_validos[:10]:  # Mostrar solo los primeros 10 para no saturar la consola
             if banco.lower() == "bancoestado":
                 tabla.add_row([
                     mov.get("Fecha", ""),
@@ -70,8 +90,8 @@ def mostrar_resumen_datos(banco, saldo, movimientos):
         
         print(tabla)
         
-        if len(movimientos) > 10:
-            print(f"... y {len(movimientos) - 10} movimientos más.")
+        if len(movimientos_validos) > 10:
+            print(f"... y {len(movimientos_validos) - 10} movimientos más.")
     
     print("\n" + "="*50)
     print(f"FIN DEL RESUMEN - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

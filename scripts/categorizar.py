@@ -194,6 +194,32 @@ def es_cargo(monto, banco=None):
         logger.warning("No se pudo determinar si '%s' es un cargo", monto)
         return False
 
+def es_cargo_valido(monto, banco=None):
+    """
+    Determina si un monto representa un cargo/costo válido (no nulo, no cero).
+    
+    Args:
+        monto: El monto a evaluar
+        banco (str, optional): El nombre del banco si está disponible
+        
+    Returns:
+        bool: True si es un cargo válido, False en caso contrario
+    """
+    try:
+        # Convertir a número si es string
+        if isinstance(monto, str):
+            # Eliminar símbolos y formateo
+            monto_limpio = monto.replace("$", "").replace(".", "").replace(",", ".")
+            monto = float(monto_limpio)
+        else:
+            monto = float(monto)
+        
+        # Verificar que no sea cero ni None
+        return monto != 0 and monto is not None
+    except (ValueError, TypeError):
+        # Si no podemos convertir a número, no es un cargo válido
+        return False
+
 def es_mes_en_curso(fecha):
     """
     Verifica si una fecha está en el mes en curso.
@@ -233,6 +259,10 @@ def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True, me
         monto = mov.get("Cargo", 0)
         banco = mov.get("Banco")  # Algunos movimientos podrían tener el banco identificado
         
+        # Verificar si el cargo es válido (no nulo, no cero)
+        if not es_cargo_valido(monto, banco):
+            continue
+            
         # Si solo queremos considerar cargos, verificar si este movimiento es un cargo
         if solo_cargos and not es_cargo(monto, banco):
             continue
@@ -245,7 +275,11 @@ def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True, me
                 monto = float(monto)
             except ValueError:
                 logger.warning("No se pudo convertir el monto '%s' a número", monto)
-                monto = 0
+                continue  # Saltamos este movimiento ya que no podemos procesar el monto
+        
+        # Verificar nuevamente que el monto no sea cero después de la conversión
+        if monto == 0:
+            continue
         
         # Tomar valor absoluto del monto para calcular totales
         # (los cargos suelen ser negativos pero queremos mostrar totales positivos)

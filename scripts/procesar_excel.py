@@ -44,9 +44,11 @@ def extraer_datos_bancoestado(archivo):
         13:, [0, 1, 2, 3]
     ]  # Fecha, N° Operación, Descripción, Cargo
     df_movimientos.columns = ["Fecha", "N° Operación", "Descripción", "Cargo"]
-    # Filtrar solo los cargos (valores negativos)
+    # Filtrar solo los cargos (valores negativos) y eliminar cargos nulos o cero
     df_movimientos = df_movimientos[
-        pd.to_numeric(df_movimientos["Cargo"], errors="coerce") < 0
+        (pd.to_numeric(df_movimientos["Cargo"], errors="coerce") < 0) &
+        (pd.to_numeric(df_movimientos["Cargo"], errors="coerce").notnull()) &
+        (pd.to_numeric(df_movimientos["Cargo"], errors="coerce") != 0)
     ]
     # Convertir DataFrame a lista de diccionarios
     movimientos_bancoestado = df_movimientos.to_dict(orient="records")
@@ -133,11 +135,15 @@ def extraer_datos_bancochile(archivo):
                         "Ejemplos de valores en columna Cargo: %s", cargo_examples
                     )
 
-                    # Intentar convertir a numérico y filtrar
+                    # Intentar convertir a numérico y filtrar (eliminando también los cargos nulos o cero)
                     df_movimientos["Cargo_num"] = pd.to_numeric(
                         df_movimientos["Cargo"], errors="coerce"
                     )
-                    filtered_df = df_movimientos[df_movimientos["Cargo_num"] < 0]
+                    filtered_df = df_movimientos[
+                        (df_movimientos["Cargo_num"] < 0) &
+                        (df_movimientos["Cargo_num"].notnull()) &
+                        (df_movimientos["Cargo_num"] != 0)
+                    ]
 
                     logger.info("Registros antes del filtrado: %d", len(df_movimientos))
                     logger.info(
@@ -228,10 +234,13 @@ def extraer_datos_santander(archivo):
                 df_movimientos = df_movimientos[selected_columns]
                 df_movimientos.columns = column_names
 
-                # Filtrar solo cargos (valores negativos)
+                # Filtrar solo cargos (valores negativos) y eliminar cargos nulos o cero
                 if "Cargo" in df_movimientos.columns:
+                    cargo_num = pd.to_numeric(df_movimientos["Cargo"], errors="coerce")
                     df_movimientos = df_movimientos[
-                        pd.to_numeric(df_movimientos["Cargo"], errors="coerce") < 0
+                        (cargo_num < 0) &
+                        (cargo_num.notnull()) &
+                        (cargo_num != 0)
                     ]
 
                 # Convertir DataFrame a lista de diccionarios
@@ -295,11 +304,12 @@ def extraer_datos_bci(archivo):
                 df_movimientos = df_movimientos[selected_columns]
                 df_movimientos.columns = column_names
 
-                # Filtrar solo cargos (valores negativos o positivos según el formato)
+                # Filtrar solo cargos (valores no nulos y diferentes de cero)
                 if "Cargo" in df_movimientos.columns:
-                    # Asumimos que en BCI los cargos son positivos (verificar con muestras reales)
+                    cargo_num = pd.to_numeric(df_movimientos["Cargo"], errors="coerce")
                     df_movimientos = df_movimientos[
-                        pd.to_numeric(df_movimientos["Cargo"], errors="coerce") != 0
+                        (cargo_num.notnull()) &
+                        (cargo_num != 0)
                     ]
 
                 # Convertir DataFrame a lista de diccionarios
