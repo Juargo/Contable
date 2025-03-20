@@ -50,7 +50,7 @@ def crear_configuracion_inicial():
     print("Por favor, edite el archivo y agregue su ID de Google Spreadsheet")
 
 
-def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=False, solo_cargos=True):
+def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=False, solo_cargos=True, mes_en_curso=False):
     """Procesa los archivos Excel del directorio y actualiza Google Sheets"""
     config = cargar_configuracion()
     if not solo_mostrar and not config.get("spreadsheet_id"):
@@ -138,11 +138,11 @@ def procesar_archivos(directorio, banco=None, solo_mostrar=False, categorizar=Fa
     # Mostrar resumen categorizado si se solicita
     if categorizar and todos_movimientos:
         logger.info("Generando resumen categorizado de %d movimientos", len(todos_movimientos))
-        mostrar_resumen_categorizado(todos_movimientos, solo_cargos=solo_cargos)
+        mostrar_resumen_categorizado(todos_movimientos, solo_cargos=solo_cargos, mes_en_curso=mes_en_curso)
 
         # Si no es solo mostrar, también exportar el resumen a Google Sheets
         if not solo_mostrar and config.get("spreadsheet_id"):
-            exportar_resumen_a_gsheet(todos_movimientos, nombre_hoja="Resumen_Categorizado", solo_cargos=solo_cargos)
+            exportar_resumen_a_gsheet(todos_movimientos, nombre_hoja="Resumen_Categorizado", solo_cargos=solo_cargos, mes_en_curso=mes_en_curso)
 
 
 if __name__ == "__main__":
@@ -178,6 +178,10 @@ if __name__ == "__main__":
         help="Incluir todos los movimientos en la categorización, no solo los cargos"
     )
     parser.add_argument(
+        "--mes-en-curso", "-m", action="store_true",
+        help="Mostrar solo los movimientos del mes en curso"
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Activa el modo debug con logs detallados"
     )
 
@@ -199,4 +203,4 @@ if __name__ == "__main__":
         )
 
     # Procesar archivos
-    procesar_archivos(directorio_absoluto, args.banco, args.solo_mostrar, args.categorizar, args.solo_cargos)
+    procesar_archivos(directorio_absoluto, args.banco, args.solo_mostrar, args.categorizar, args.solo_cargos, args.mes_en_curso)

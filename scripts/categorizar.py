@@ -25,15 +25,41 @@ def cargar_categorias():
         return cargar_categorias()
     except json.JSONDecodeError:
         logger.error("Error al leer el archivo de categorías. Formato JSON inválido.")
-        return {"Otros": []}
+        return {"Otros": {"palabras_clave": [], "subcategorias": {"General": {"palabras_clave": []}}}}
 
 def crear_diccionario_predeterminado():
     """Crea un diccionario de categorías predeterminado si no existe."""
     categorias_predeterminadas = {
-        "Transporte público": ["PAGO AUTOMATICO PASAJE QR", "PASAJE", "METRO", "BIP"],
-        "Supermercado": ["JUMBO", "LIDER", "SANTA ISABEL", "UNIMARC", "TOTTUS"],
-        "Servicios básicos": ["ENEL", "AGUAS", "LUZ", "AGUA", "GAS", "INTERNET"],
-        "Otros": []
+        "Transporte": {
+            "palabras_clave": ["TRANSPORTE"],
+            "subcategorias": {
+                "Público": {
+                    "palabras_clave": ["PAGO AUTOMATICO PASAJE QR", "PASAJE", "METRO", "BIP"]
+                },
+                "Otros": {
+                    "palabras_clave": []
+                }
+            }
+        },
+        "Alimentación": {
+            "palabras_clave": ["ALIMENTO"],
+            "subcategorias": {
+                "Supermercado": {
+                    "palabras_clave": ["JUMBO", "LIDER", "SANTA ISABEL", "UNIMARC", "TOTTUS"]
+                },
+                "Otros": {
+                    "palabras_clave": []
+                }
+            }
+        },
+        "Otros": {
+            "palabras_clave": [],
+            "subcategorias": {
+                "General": {
+                    "palabras_clave": []
+                }
+            }
+        }
     }
     
     ruta_config = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
@@ -48,31 +74,44 @@ def crear_diccionario_predeterminado():
 
 def categorizar_movimiento(descripcion, categorias):
     """
-    Asigna una categoría a un movimiento basado en su descripción.
+    Asigna una categoría y subcategoría a un movimiento basado en su descripción.
     
     Args:
         descripcion (str): Descripción del movimiento
         categorias (dict): Diccionario de categorías
         
     Returns:
-        str: Nombre de la categoría asignada
+        tuple: (str: Nombre de la categoría asignada, str: Nombre de la subcategoría asignada)
     """
     if not descripcion or not isinstance(descripcion, str):
-        return "Otros"
+        return "Otros", "General"
     
     descripcion = descripcion.upper()
     
-    # Buscar coincidencias en cada categoría
-    for categoria, palabras_clave in categorias.items():
-        for palabra in palabras_clave:
-            if palabra.upper() in descripcion:
-                logger.debug("Movimiento '%s' categorizado como '%s' por palabra clave '%s'", 
-                            descripcion, categoria, palabra)
-                return categoria
+    # Primero intentar encontrar coincidencia exacta para subcategorías
+    for categoria, datos_categoria in categorias.items():
+        subcategorias = datos_categoria.get("subcategorias", {})
+        for subcategoria, datos_subcategoria in subcategorias.items():
+            palabras_subcategoria = datos_subcategoria.get("palabras_clave", [])
+            for palabra in palabras_subcategoria:
+                if palabra.upper() in descripcion:
+                    logger.debug("Movimiento '%s' categorizado como '%s - %s' por palabra clave '%s'", 
+                                descripcion, categoria, subcategoria, palabra)
+                    return categoria, subcategoria
     
-    # Si no hay coincidencias, asignar "Otros"
-    logger.debug("Movimiento '%s' categorizado como 'Otros' (sin coincidencias)", descripcion)
-    return "Otros"
+    # Si no hay coincidencias en subcategorías, buscar en categorías principales
+    for categoria, datos_categoria in categorias.items():
+        palabras_categoria = datos_categoria.get("palabras_clave", [])
+        for palabra in palabras_categoria:
+            if palabra.upper() in descripcion:
+                # Si hay coincidencia en categoría principal, asignar subcategoría "Otros"
+                logger.debug("Movimiento '%s' categorizado como '%s - Otros' por palabra clave '%s'", 
+                            descripcion, categoria, palabra)
+                return categoria, "Otros"
+    
+    # Si no hay coincidencias, asignar "Otros - General"
+    logger.debug("Movimiento '%s' categorizado como 'Otros - General' (sin coincidencias)", descripcion)
+    return "Otros", "General"
 
 def obtener_mes_anio(fecha):
     """
@@ -158,17 +197,31 @@ def es_cargo(monto, banco=None):
         logger.warning("No se pudo determinar si '%s' es un cargo", monto)
         return False
 
-def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True):
+def es_mes_en_curso(fecha):
     """
-    Agrupa los movimientos por mes y categoría.
+    Verifica si una fecha está en el mes en curso.
+    
+    Args:
+        fecha (datetime): Fecha a verificar
+        
+    Returns:
+        bool: True si la fecha está en el mes en curso, False en caso contrario
+    """
+    hoy = datetime.today()
+    return fecha is not None and fecha.year == hoy.year and fecha.month == hoy.month
+
+def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True, mes_en_curso=False):
+    """
+    Agrupa los movimientos por mes, categoría y subcategoría.
     
     Args:
         movimientos (list): Lista de movimientos
         categorias (dict, optional): Diccionario de categorías. Si es None, se carga del archivo.
         solo_cargos (bool): Si solo se deben considerar los movimientos de cargo/costo
+        mes_en_curso (bool): Si solo se deben considerar los movimientos del mes en curso
         
     Returns:
-        dict: Diccionario con estructura {mes: {categoria: total}}
+        dict: Diccionario con estructura {mes: {categoria: {subcategoria: {...}}}}
     """
     if categorias is None:
         categorias = cargar_categorias()
@@ -208,8 +261,12 @@ def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True):
         else:
             mes_anio, fecha_dt = obtener_mes_anio(fecha)
         
+        # Si solo queremos considerar movimientos del mes en curso, verificar la fecha
+        if mes_en_curso and (fecha_dt is None or not es_mes_en_curso(fecha_dt)):
+            continue
+        
         # Categorizar el movimiento
-        categoria = categorizar_movimiento(descripcion, categorias)
+        categoria, subcategoria = categorizar_movimiento(descripcion, categorias)
         
         # Agregar al diccionario agrupado
         if mes_anio not in agrupado:
@@ -221,16 +278,24 @@ def agrupar_por_mes_categoria(movimientos, categorias=None, solo_cargos=True):
         if categoria not in agrupado[mes_anio]["categorias"]:
             agrupado[mes_anio]["categorias"][categoria] = {
                 "total": 0,
+                "subcategorias": {}
+            }
+        
+        if subcategoria not in agrupado[mes_anio]["categorias"][categoria]["subcategorias"]:
+            agrupado[mes_anio]["categorias"][categoria]["subcategorias"][subcategoria] = {
+                "total": 0,
                 "movimientos": []
             }
         
+        # Actualizar totales
         agrupado[mes_anio]["categorias"][categoria]["total"] += monto
-        agrupado[mes_anio]["categorias"][categoria]["movimientos"].append(mov)
+        agrupado[mes_anio]["categorias"][categoria]["subcategorias"][subcategoria]["total"] += monto
+        agrupado[mes_anio]["categorias"][categoria]["subcategorias"][subcategoria]["movimientos"].append(mov)
     
     logger.info("Movimientos agrupados por mes y categoría: %d meses", len(agrupado))
     return agrupado
 
-def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos=True):
+def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos=True, mes_en_curso=False):
     """
     Muestra un resumen de gastos categorizados y agrupados por mes.
     
@@ -238,9 +303,10 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
         movimientos (list): Lista de movimientos
         mostrar_detalle (bool): Si se debe mostrar el detalle de movimientos por categoría
         solo_cargos (bool): Si solo se deben considerar los movimientos de cargo/costo
+        mes_en_curso (bool): Si solo se deben considerar los movimientos del mes en curso
     """
     categorias = cargar_categorias()
-    agrupado = agrupar_por_mes_categoria(movimientos, categorias, solo_cargos)
+    agrupado = agrupar_por_mes_categoria(movimientos, categorias, solo_cargos, mes_en_curso)
     
     # Ordenar meses cronológicamente
     # Usamos una clave personalizada: primero por fecha si está disponible, luego alfabéticamente
@@ -254,17 +320,18 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
     
     meses_ordenados = sorted(agrupado.keys(), key=clave_ordenamiento)
     
-    print("\n" + "="*60)
-    print("RESUMEN DE GASTOS POR MES Y CATEGORÍA")
-    print("="*60)
+    print("\n" + "="*70)
+    print("RESUMEN DE GASTOS POR MES, CATEGORÍA Y SUBCATEGORÍA")
+    print("="*70)
     
     for mes in meses_ordenados:
         print(f"\n{mes}")
-        print("-"*60)
+        print("-"*70)
         
         tabla = PrettyTable()
-        tabla.field_names = ["Categoría", "Total", "# Movimientos"]
+        tabla.field_names = ["Categoría", "Subcategoría", "Total", "# Movimientos"]
         tabla.align["Categoría"] = "l"
+        tabla.align["Subcategoría"] = "l"
         tabla.align["Total"] = "r"
         tabla.align["# Movimientos"] = "r"
         
@@ -280,52 +347,82 @@ def mostrar_resumen_categorizado(movimientos, mostrar_detalle=False, solo_cargos
         
         for categoria in categorias_ordenadas:
             datos_categoria = categorias_mes[categoria]
-            total = datos_categoria["total"]
-            num_movimientos = len(datos_categoria["movimientos"])
+            total_categoria = datos_categoria["total"]
             
+            # Obtener subcategorías ordenadas por monto
+            subcategorias = datos_categoria["subcategorias"]
+            subcategorias_ordenadas = sorted(
+                subcategorias.keys(),
+                key=lambda sc: subcategorias[sc]["total"],
+                reverse=True
+            )
+            
+            # Calcular totales para esta categoría
+            total_movimientos_categoria = sum(
+                len(subcategorias[sc]["movimientos"])
+                for sc in subcategorias
+            )
+            
+            # Añadir fila de la categoría principal
             tabla.add_row([
-                categoria,
-                f"${total:,.2f}",
-                num_movimientos
+                f"**{categoria}**",
+                "",
+                f"**${total_categoria:,.2f}**",
+                f"**{total_movimientos_categoria}**"
             ])
             
-            total_mes += total
-            total_movimientos_mes += num_movimientos
-            
-            # Mostrar detalle de movimientos si se solicita
-            if mostrar_detalle and num_movimientos > 0:
-                print(f"\nDetalle de {categoria}:")
-                tabla_detalle = PrettyTable()
-                tabla_detalle.field_names = ["Fecha", "Descripción", "Monto"]
-                tabla_detalle.align["Descripción"] = "l"
-                tabla_detalle.align["Monto"] = "r"
-                tabla_detalle.max_width["Descripción"] = 50
+            # Añadir subcategorías
+            for subcategoria in subcategorias_ordenadas:
+                datos_subcategoria = subcategorias[subcategoria]
+                total_subcategoria = datos_subcategoria["total"]
+                num_movimientos = len(datos_subcategoria["movimientos"])
                 
-                for mov in datos_categoria["movimientos"]:
-                    fecha = mov.get("Fecha", "")
-                    desc = mov.get("Descripción", mov.get("Detalle", ""))
-                    monto = abs(float(mov.get("Cargo", 0)))
-                    
-                    tabla_detalle.add_row([
-                        fecha,
-                        desc[:50],
-                        f"${monto:,.2f}"
+                if total_subcategoria > 0:
+                    tabla.add_row([
+                        "",
+                        subcategoria,
+                        f"${total_subcategoria:,.2f}",
+                        num_movimientos
                     ])
-                
-                print(tabla_detalle)
+                    
+                    # Mostrar detalle de movimientos si se solicita
+                    if mostrar_detalle and num_movimientos > 0:
+                        print(f"\nDetalle de {categoria} - {subcategoria}:")
+                        tabla_detalle = PrettyTable()
+                        tabla_detalle.field_names = ["Fecha", "Descripción", "Monto"]
+                        tabla_detalle.align["Descripción"] = "l"
+                        tabla_detalle.align["Monto"] = "r"
+                        tabla_detalle.max_width["Descripción"] = 50
+                        
+                        for mov in datos_subcategoria["movimientos"]:
+                            fecha = mov.get("Fecha", "")
+                            desc = mov.get("Descripción", mov.get("Detalle", ""))
+                            monto = abs(float(mov.get("Cargo", 0)))
+                            
+                            tabla_detalle.add_row([
+                                fecha,
+                                desc[:50],
+                                f"${monto:,.2f}"
+                            ])
+                        
+                        print(tabla_detalle)
+            
+            total_mes += total_categoria
+            total_movimientos_mes += total_movimientos_categoria
         
         # Agregar fila de totales
         tabla.add_row([
             "TOTAL",
+            "",
             f"${total_mes:,.2f}",
             total_movimientos_mes
         ])
         
         print(tabla)
     
-    print("\n" + "="*60)
+    print("\n" + "="*70)
 
-def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen", solo_cargos=True):
+def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen", solo_cargos=True, mes_en_curso=False):
     """
     Exporta el resumen categorizado a Google Sheets.
     
@@ -334,6 +431,7 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
         gsheet_id (str, optional): ID de la hoja de Google Sheets
         nombre_hoja (str): Nombre de la hoja donde se exportará el resumen
         solo_cargos (bool): Si solo se deben considerar los movimientos de cargo/costo
+        mes_en_curso (bool): Si solo se deben considerar los movimientos del mes en curso
         
     Returns:
         bool: True si la exportación fue exitosa, False en caso contrario
@@ -342,7 +440,7 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
         from scripts.actualizar_gsheet import conectar_gsheet
         
         categorias = cargar_categorias()
-        agrupado = agrupar_por_mes_categoria(movimientos, categorias, solo_cargos)
+        agrupado = agrupar_por_mes_categoria(movimientos, categorias, solo_cargos, mes_en_curso)
         
         # Ordenar meses cronológicamente (misma función que en mostrar_resumen_categorizado)
         def clave_ordenamiento(mes):
@@ -366,12 +464,12 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
         
         # Preparar datos para exportar
         datos = []
-        datos.append(["RESUMEN DE GASTOS POR MES Y CATEGORÍA", "", ""])
-        datos.append(["", "", ""])
+        datos.append(["RESUMEN DE GASTOS POR MES, CATEGORÍA Y SUBCATEGORÍA", "", "", ""])
+        datos.append(["", "", "", ""])
         
         for mes in meses_ordenados:
-            datos.append([mes, "", ""])
-            datos.append(["Categoría", "Total", "# Movimientos"])
+            datos.append([mes, "", "", ""])
+            datos.append(["Categoría", "Subcategoría", "Total", "# Movimientos"])
             
             categorias_mes = agrupado[mes]["categorias"]
             categorias_ordenadas = sorted(
@@ -385,20 +483,55 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
             
             for categoria in categorias_ordenadas:
                 datos_categoria = categorias_mes[categoria]
-                total = datos_categoria["total"]
-                num_movimientos = len(datos_categoria["movimientos"])
+                total_categoria = datos_categoria["total"]
                 
+                # Obtener subcategorías ordenadas por monto
+                subcategorias = datos_categoria["subcategorias"]
+                subcategorias_ordenadas = sorted(
+                    subcategorias.keys(),
+                    key=lambda sc: subcategorias[sc]["total"],
+                    reverse=True
+                )
+                
+                # Calcular totales para esta categoría
+                total_movimientos_categoria = sum(
+                    len(subcategorias[sc]["movimientos"])
+                    for sc in subcategorias
+                )
+                
+                # Añadir fila de la categoría principal
                 datos.append([
                     categoria,
-                    total,
-                    num_movimientos
+                    "",
+                    total_categoria,
+                    total_movimientos_categoria
                 ])
                 
-                total_mes += total
-                total_movimientos_mes += num_movimientos
+                # Añadir subcategorías
+                for subcategoria in subcategorias_ordenadas:
+                    datos_subcategoria = subcategorias[subcategoria]
+                    total_subcategoria = datos_subcategoria["total"]
+                    num_movimientos = len(datos_subcategoria["movimientos"])
+                    
+                    if total_subcategoria > 0:
+                        datos.append([
+                            "",
+                            subcategoria,
+                            total_subcategoria,
+                            num_movimientos
+                        ])
+                
+                total_mes += total_categoria
+                total_movimientos_mes += total_movimientos_categoria
             
-            datos.append(["TOTAL", total_mes, total_movimientos_mes])
-            datos.append(["", "", ""])
+            # Agregar fila de totales
+            datos.append([
+                "TOTAL",
+                "",
+                total_mes,
+                total_movimientos_mes
+            ])
+            datos.append(["", "", "", ""])
         
         # Actualizar hoja de cálculo
         worksheet.clear()
@@ -408,6 +541,11 @@ def exportar_resumen_a_gsheet(movimientos, gsheet_id=None, nombre_hoja="Resumen"
         worksheet.format('A1', {
             "textFormat": {"bold": True, "fontSize": 14}
         })
+        
+        # Aplicar formato a categorías principales y totales (en negrita)
+        for i, fila in enumerate(datos):
+            if fila[0] and not fila[1] and fila[0] != "Categoría":  # Es categoría principal o total
+                worksheet.format(f'A{i+1}:D{i+1}', {"textFormat": {"bold": True}})
         
         logger.info("Resumen categorizado exportado a Google Sheets")
         return True

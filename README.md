@@ -156,9 +156,14 @@ Estos errores indican que algunos módulos no están instalados correctamente:
    python run.py --categorizar --todos-movimientos
    ```
 
-9. Para combinar opciones:
+9. Para mostrar solo los movimientos del mes en curso:
    ```
-   python run.py --banco bancoestado --solo-mostrar --categorizar
+   python run.py --categorizar --mes-en-curso
+   ```
+
+10. Para combinar opciones:
+   ```
+   python run.py --banco bancoestado --solo-mostrar --categorizar --mes-en-curso
    ```
 
 ## Categorización de gastos
@@ -169,18 +174,41 @@ Por defecto, la categorización solo considera los movimientos que representan c
 
 ### Personalizar categorías
 
-Puedes editar el archivo `config/categorias.json` para ajustar las categorías y palabras clave según tus necesidades. El formato es:
+El sistema utiliza un esquema jerárquico con categorías y subcategorías. Puedes editar el archivo `config/categorias.json` para ajustar las categorías, subcategorías y palabras clave según tus necesidades. El formato es:
 
 ```json
 {
-  "Nombre de categoría": [
-    "PALABRA_CLAVE1",
-    "PALABRA_CLAVE2",
-    ...
-  ],
-  ...
+  "Nombre de categoría": {
+    "palabras_clave": ["PALABRA1", "PALABRA2"],
+    "subcategorias": {
+      "Nombre subcategoría 1": {
+        "palabras_clave": ["PALABRA3", "PALABRA4"]
+      },
+      "Nombre subcategoría 2": {
+        "palabras_clave": ["PALABRA5", "PALABRA6"]
+      }
+    }
+  }
 }
 ```
+
+#### Funcionamiento del sistema de categorización:
+
+1. El sistema busca primero coincidencias en las palabras clave de las subcategorías
+2. Si encuentra una coincidencia, asigna esa subcategoría al movimiento
+3. Si no encuentra coincidencia en subcategorías, busca en las palabras clave de categorías principales
+4. Si encuentra coincidencia a nivel de categoría, asigna la subcategoría "Otros"
+5. Si no encuentra ninguna coincidencia, asigna "Otros - General"
+
+### Migración desde versión anterior
+
+Si vienes de una versión anterior del sistema sin subcategorías, puedes migrar tu archivo de categorías ejecutando:
+
+```
+python -m scripts.utils.migracion_categorias
+```
+
+Esto convertirá tu archivo manteniendo todas las palabras clave existentes y creando la estructura necesaria para subcategorías.
 
 ### Resumen categorizado
 
@@ -188,9 +216,9 @@ Al usar la opción `--categorizar`, el sistema:
 
 1. Procesa todos los archivos Excel encontrados
 2. Filtra los movimientos para considerar solo los cargos (a menos que se use `--todos-movimientos`)
-3. Clasifica cada movimiento en una categoría según las palabras clave
-4. Agrupa los movimientos por mes y categoría
-5. Muestra un resumen en la consola con los totales por categoría en cada mes
+3. Clasifica cada movimiento en una categoría y subcategoría según las palabras clave
+4. Agrupa los movimientos por mes, categoría y subcategoría
+5. Muestra un resumen en la consola con los totales por categoría y subcategoría en cada mes
 6. Opcionalmente exporta el resumen a una hoja en Google Sheets
 
 ## Bancos soportados
