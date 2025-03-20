@@ -31,10 +31,12 @@ def crear_diccionario_predeterminado():
     """Crea un diccionario de categorías predeterminado si no existe."""
     categorias_predeterminadas = {
         "Transporte": {
-            "palabras_clave": ["TRANSPORTE"],
             "subcategorias": {
                 "Público": {
                     "palabras_clave": ["PAGO AUTOMATICO PASAJE QR", "PASAJE", "METRO", "BIP"]
+                },
+                "Taxi/Uber": {
+                    "palabras_clave": ["UBER", "CABIFY", "DIDI", "TAXI"]
                 },
                 "Otros": {
                     "palabras_clave": []
@@ -42,10 +44,12 @@ def crear_diccionario_predeterminado():
             }
         },
         "Alimentación": {
-            "palabras_clave": ["ALIMENTO"],
             "subcategorias": {
                 "Supermercado": {
                     "palabras_clave": ["JUMBO", "LIDER", "SANTA ISABEL", "UNIMARC", "TOTTUS"]
+                },
+                "Restaurantes": {
+                    "palabras_clave": ["RESTAURANT", "RESTAURANTE"]
                 },
                 "Otros": {
                     "palabras_clave": []
@@ -53,7 +57,6 @@ def crear_diccionario_predeterminado():
             }
         },
         "Otros": {
-            "palabras_clave": [],
             "subcategorias": {
                 "General": {
                     "palabras_clave": []
@@ -75,6 +78,8 @@ def crear_diccionario_predeterminado():
 def categorizar_movimiento(descripcion, categorias):
     """
     Asigna una categoría y subcategoría a un movimiento basado en su descripción.
+    Ahora solo busca coincidencias en subcategorías, ya que las categorías principales
+    no tienen palabras clave propias.
     
     Args:
         descripcion (str): Descripción del movimiento
@@ -88,26 +93,18 @@ def categorizar_movimiento(descripcion, categorias):
     
     descripcion = descripcion.upper()
     
-    # Primero intentar encontrar coincidencia exacta para subcategorías
+    # Buscar coincidencias solamente en las subcategorías
     for categoria, datos_categoria in categorias.items():
         subcategorias = datos_categoria.get("subcategorias", {})
         for subcategoria, datos_subcategoria in subcategorias.items():
             palabras_subcategoria = datos_subcategoria.get("palabras_clave", [])
             for palabra in palabras_subcategoria:
+                if not palabra:  # Ignorar palabras vacías
+                    continue
                 if palabra.upper() in descripcion:
                     logger.debug("Movimiento '%s' categorizado como '%s - %s' por palabra clave '%s'", 
                                 descripcion, categoria, subcategoria, palabra)
                     return categoria, subcategoria
-    
-    # Si no hay coincidencias en subcategorías, buscar en categorías principales
-    for categoria, datos_categoria in categorias.items():
-        palabras_categoria = datos_categoria.get("palabras_clave", [])
-        for palabra in palabras_categoria:
-            if palabra.upper() in descripcion:
-                # Si hay coincidencia en categoría principal, asignar subcategoría "Otros"
-                logger.debug("Movimiento '%s' categorizado como '%s - Otros' por palabra clave '%s'", 
-                            descripcion, categoria, palabra)
-                return categoria, "Otros"
     
     # Si no hay coincidencias, asignar "Otros - General"
     logger.debug("Movimiento '%s' categorizado como 'Otros - General' (sin coincidencias)", descripcion)

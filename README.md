@@ -179,13 +179,12 @@ El sistema utiliza un esquema jerárquico con categorías y subcategorías. Pued
 ```json
 {
   "Nombre de categoría": {
-    "palabras_clave": ["PALABRA1", "PALABRA2"],
     "subcategorias": {
       "Nombre subcategoría 1": {
-        "palabras_clave": ["PALABRA3", "PALABRA4"]
+        "palabras_clave": ["PALABRA1", "PALABRA2"]
       },
       "Nombre subcategoría 2": {
-        "palabras_clave": ["PALABRA5", "PALABRA6"]
+        "palabras_clave": ["PALABRA3", "PALABRA4"]
       }
     }
   }
@@ -194,11 +193,10 @@ El sistema utiliza un esquema jerárquico con categorías y subcategorías. Pued
 
 #### Funcionamiento del sistema de categorización:
 
-1. El sistema busca primero coincidencias en las palabras clave de las subcategorías
-2. Si encuentra una coincidencia, asigna esa subcategoría al movimiento
-3. Si no encuentra coincidencia en subcategorías, busca en las palabras clave de categorías principales
-4. Si encuentra coincidencia a nivel de categoría, asigna la subcategoría "Otros"
-5. Si no encuentra ninguna coincidencia, asigna "Otros - General"
+1. El sistema busca coincidencias en las palabras clave de las subcategorías
+2. Si encuentra una coincidencia, asigna esa subcategoría y su categoría principal al movimiento
+3. Si no encuentra ninguna coincidencia, asigna "Otros - General"
+4. El valor de cada categoría principal es la suma de todas sus subcategorías
 
 ### Migración desde versión anterior
 
