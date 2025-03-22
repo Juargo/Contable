@@ -93,6 +93,71 @@ pnpm run dev
 
 Este comando usa concurrently para iniciar tanto el frontend como el backend en un solo terminal.
 
+## Ejecución con Docker
+
+El proyecto incluye configuración Docker para facilitar su despliegue y desarrollo.
+
+### Requisitos
+
+- Docker
+- Docker Compose
+
+### Configuración
+
+1. Los archivos Docker se encuentran en el directorio `docker/`
+2. El archivo principal de configuración es `docker/docker-compose.yml`
+3. Las variables de entorno están definidas en el archivo `.env` en la raíz
+
+### Comandos principales
+
+Puedes usar el Makefile incluido para operaciones comunes:
+
+```bash
+# Iniciar todos los servicios en segundo plano
+make up
+
+# Detener todos los servicios
+make down
+
+# Ver logs de todos los servicios
+make logs
+
+# Acceder a la shell del backend
+make shell-backend
+
+# Acceder al cliente MySQL
+make mysql-cli
+
+# Ver todos los comandos disponibles
+make help
+```
+
+O usar Docker Compose directamente:
+
+```bash
+# Iniciar los contenedores
+docker-compose -f docker/docker-compose.yml up -d
+
+# Detener los contenedores
+docker-compose -f docker/docker-compose.yml down
+```
+
+### Servicios incluidos
+
+- **MySQL**: Base de datos para almacenar transacciones
+- **Backend**: API de FastAPI
+- **Frontend**: Aplicación Astro con React
+
+### Estructura de la base de datos
+
+La base de datos incluye tablas para:
+- Bancos
+- Transacciones
+- Categorías y subcategorías
+- Palabras clave para categorización automática
+
+Al iniciar el contenedor por primera vez, se ejecutan los scripts de inicialización en `docker/mysql/init/`.
+
 ## Uso de la API
 
 ### Endpoints disponibles:

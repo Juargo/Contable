@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Base de datos MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: contable-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: contable_db
+      MYSQL_USER: contable_user
+      MYSQL_PASSWORD: contable_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+      - ./mysql/config/my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      - contable-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Servicio para el backend (Python FastAPI)
+  backend:
+    build:
+      context: ..
+      dockerfile: ./docker/backend/Dockerfile
+    container_name: contable-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=mysql+pymysql://contable_user:contable_password@mysql:3306/contable_db
+      - PORT=8000
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    networks:
+      - contable-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Servicio para el frontend (Astro con React)
+  frontend:
+    build:
+      context: ..
+      dockerfile: ./docker/frontend/Dockerfile
+    container_name: contable-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4321:4321"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    networks:
+      - contable-network
+    environment:
+      - NODE_ENV=development
+      - BACKEND_URL=http://backend:8000
+    command: pnpm run dev --host 0.0.0.0
+
+# Volúmenes persistentes
+volumes:
+  mysql_data:
+    driver: local
+
+# Redes
+networks:
+  contable-network:
+    driver: bridge
