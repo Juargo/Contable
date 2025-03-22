@@ -21,6 +21,7 @@ app.include_router(transactions_router, prefix="/api")
 
 @app.get("/")
 async def read_root():
+    """Ruta raíz de la API"""
     return {"message": "Bienvenido a la API de Contable"}
 
 if __name__ == "__main__":
