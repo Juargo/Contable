@@ -1,8 +1,8 @@
 -- Script inicial para crear las tablas y estructuras necesarias
 
 -- Crear base de datos si no existe
-CREATE DATABASE IF NOT EXISTS contable_db;
-USE contable_db;
+CREATE DATABASE IF NOT EXISTS moneydairy_db;
+USE moneydairy_db;
 
 -- Tabla para bancos
 CREATE TABLE IF NOT EXISTS banks (
@@ -100,5 +100,5 @@ INSERT INTO category_keywords (category_id, keyword) VALUES
     (14, 'DEVOLUCION');
 
 -- Permisos
-GRANT ALL PRIVILEGES ON contable_db.* TO 'contable_user'@'%';
+GRANT ALL PRIVILEGES ON moneydairy_db.* TO 'moneydairy_user'@'%';
 FLUSH PRIVILEGES;

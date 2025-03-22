@@ -1,6 +1,6 @@
-# Aplicación Contable
+# MoneyDairy
 
-Esta aplicación utiliza Astro con React para el frontend y FastAPI para el backend, permitiendo procesar reportes bancarios y visualizar transacciones.
+Aplicación para gestión de finanzas personales que utiliza Astro con React para el frontend y FastAPI para el backend, permitiendo procesar reportes bancarios y visualizar transacciones.
 
 ## Requisitos previos
 
@@ -18,7 +18,7 @@ Esta aplicación utiliza Astro con React para el frontend y FastAPI para el back
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd Contable
+cd MoneyDairy
 ```
 
 ### 2. Configurar el entorno del frontend
@@ -180,7 +180,7 @@ curl -X POST http://localhost:8000/api/upload-bank-report \
 ## Estructura del proyecto
 
 ```
-/Contable/
+/MoneyDairy/
 ├── frontend/             # Frontend con Astro y React
 │   ├── public/           # Archivos estáticos
 │   ├── src/              # Código fuente
@@ -226,7 +226,7 @@ pip install -r requirements.txt
 - Asegúrate de que el formato del archivo coincida con el esperado por el procesador del banco específico
 - Verifica los logs del servidor para obtener información detallada sobre errores
 
-# Contable
+# MoneyDairy
 
 Sistema de procesamiento de extractos bancarios y actualización a Google Sheets.
 

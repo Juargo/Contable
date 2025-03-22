@@ -32,7 +32,7 @@ shell-frontend:
 	$(DOCKER_COMPOSE) exec frontend sh
 
 mysql-cli:
-	$(DOCKER_COMPOSE) exec mysql mysql -u contable_user -pcontable_password contable_db
+	$(DOCKER_COMPOSE) exec mysql mysql -u moneydairy_user -pmoneydairy_password moneydairy_db
 
 # Limpieza
 clean:

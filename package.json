@@ -1,7 +1,7 @@
 {
-  "name": "contable",
+  "name": "moneydairy",
   "version": "1.0.0",
-  "description": "Aplicación para gestión contable",
+  "description": "Aplicación para gestión de finanzas personales",
   "scripts": {
     "frontend:dev": "cd frontend && pnpm run dev",
     "backend:dev": "cd backend && python3 main.py",

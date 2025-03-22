@@ -1,4 +1,4 @@
-# Migración de npm a pnpm
+# Migración de npm a pnpm en MoneyDairy
 
 Este documento detalla los pasos para migrar el proyecto de npm a pnpm.
 
