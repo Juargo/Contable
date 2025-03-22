@@ -1,3 +1,166 @@
+# Aplicación Contable
+
+Esta aplicación utiliza Astro con React para el frontend y FastAPI para el backend, permitiendo procesar reportes bancarios y visualizar transacciones.
+
+## Requisitos previos
+
+### Para el frontend:
+- Node.js 14.x o superior
+- pnpm 7.x o superior (recomendado sobre npm)
+
+### Para el backend:
+- Python 3.8 o superior
+- pip (gestor de paquetes de Python)
+
+## Instalación
+
+### 1. Clonar el repositorio
+
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd Contable
+```
+
+### 2. Configurar el entorno del frontend
+
+```bash
+# Instalar pnpm globalmente si no lo tienes
+npm install -g pnpm
+
+# Instalar dependencias del proyecto principal
+pnpm install
+
+# Navegar a la carpeta del frontend
+cd frontend
+
+# Instalar dependencias de Astro y React
+pnpm install
+```
+
+### 3. Configurar el entorno del backend
+
+```bash
+# Navegar a la carpeta del backend
+cd backend
+
+# Se recomienda crear un entorno virtual
+python -m venv venv
+
+# Activar el entorno virtual
+# En Windows:
+venv\Scripts\activate
+# En macOS/Linux:
+source venv/bin/activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+```
+
+Si no existe el archivo requirements.txt, puedes crearlo con:
+
+```bash
+pip install fastapi uvicorn pandas numpy
+pip freeze > requirements.txt
+```
+
+## Ejecución del proyecto
+
+### Opción 1: Ejecutar frontend y backend por separado
+
+#### Para el frontend:
+```bash
+# Desde la carpeta raíz del proyecto
+cd frontend
+pnpm run dev
+```
+El frontend estará disponible en: http://localhost:4321
+
+#### Para el backend:
+```bash
+# Desde la carpeta raíz del proyecto
+cd backend
+python main.py
+```
+El backend estará disponible en: http://localhost:8000
+
+### Opción 2: Ejecutar todo en un solo comando
+
+Desde la carpeta raíz del proyecto:
+
+```bash
+pnpm run dev
+```
+
+Este comando usa concurrently para iniciar tanto el frontend como el backend en un solo terminal.
+
+## Uso de la API
+
+### Endpoints disponibles:
+
+- `GET /api/transactions`: Obtiene todas las transacciones
+- `POST /api/upload-bank-report`: Sube y procesa un reporte bancario
+
+### Ejemplo de uso con curl:
+
+```bash
+# Obtener transacciones
+curl http://localhost:8000/api/transactions
+
+# Subir un reporte bancario
+curl -X POST http://localhost:8000/api/upload-bank-report \
+  -F "file=@ruta/al/archivo.csv" \
+  -F "bank_name=santander"
+```
+
+## Estructura del proyecto
+
+```
+/Contable/
+├── frontend/             # Frontend con Astro y React
+│   ├── public/           # Archivos estáticos
+│   ├── src/              # Código fuente
+│   │   ├── components/   # Componentes React
+│   │   ├── layouts/      # Layouts Astro
+│   │   └── pages/        # Páginas Astro
+├── backend/              # API de Python
+│   ├── api/              # Endpoints de la API
+│   ├── models/           # Modelos de datos
+│   ├── services/         # Servicios (incluye procesamiento de datos)
+│   └── utils/            # Utilidades
+├── scripts/              # Scripts para procesar datos
+└── data/                 # Datos de la aplicación
+```
+
+## Desarrollo
+
+### Añadir nuevos bancos
+
+Para añadir soporte para un nuevo banco, sigue estos pasos:
+
+1. Crea una nueva función en `backend/services/bank_report_service.py` siguiendo el patrón de las existentes
+2. Añade el nombre del banco en el diccionario `processors` en la función `process_bank_report`
+3. Añade el nombre del banco a la lista `valid_banks` en `backend/api/transactions.py`
+4. Añade una nueva opción en el selector de bancos del frontend (`frontend/src/components/ContableApp.jsx`)
+
+## Solución de problemas
+
+### CORS (Cross-Origin Resource Sharing)
+
+Si encuentras problemas de CORS, verifica que los orígenes permitidos en `backend/main.py` incluyan la URL de tu frontend.
+
+### Errores de dependencias
+
+Si encuentras errores relacionados con dependencias Python, asegúrate de estar usando el entorno virtual y que todos los paquetes estén instalados:
+
+```bash
+pip install -r requirements.txt
+```
+
+### Problemas con la carga de archivos
+
+- Asegúrate de que el formato del archivo coincida con el esperado por el procesador del banco específico
+- Verifica los logs del servidor para obtener información detallada sobre errores
+
 # Contable
 
 Sistema de procesamiento de extractos bancarios y actualización a Google Sheets.

@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "description": "Aplicación para gestión contable",
   "scripts": {
-    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:dev": "cd frontend && pnpm run dev",
     "backend:dev": "cd backend && python main.py",
-    "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:dev\""
+    "dev": "concurrently \"pnpm run frontend:dev\" \"pnpm run backend:dev\""
   },
   "devDependencies": {
     "concurrently": "^8.0.1"
-  }
+  },
+  "packageManager": "pnpm@10.6.5"
 }
