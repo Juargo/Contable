@@ -1,0 +1,25 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ContableApp from '../components/ContableApp.jsx';
+---
+
+<Layout title="Aplicación Contable">
+  <main>
+    <h1>Aplicación Contable</h1>
+    <ContableApp client:load />
+  </main>
+</Layout>
+
+<style>
+  main {
+    margin: auto;
+    padding: 1rem;
+    max-width: 1200px;
+  }
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+</style>

@@ -1,0 +1,13 @@
+{
+  "name": "contable",
+  "version": "1.0.0",
+  "description": "Aplicación para gestión contable",
+  "scripts": {
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:dev": "cd backend && python main.py",
+    "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.1"
+  }
+}
