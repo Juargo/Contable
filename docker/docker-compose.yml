@@ -26,47 +26,47 @@ services:
       retries: 5
 
   # Servicio para el backend (Python FastAPI)
-  backend:
-    build:
-      context: ..
-      dockerfile: ./docker/backend/Dockerfile
-    container_name: moneydairy-backend
-    restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=mysql+pymysql://moneydairy_user:moneydairy_password@mysql:3306/moneydairy_db
-      - PORT=8000
-      - ENVIRONMENT=development
-    ports:
-      - "8000:8000"
-    volumes:
-      - ../backend:/app
-    networks:
-      - moneydairy-network
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  # backend:
+  #   build:
+  #     context: ..
+  #     dockerfile: ./docker/backend/Dockerfile
+  #   container_name: moneydairy-backend
+  #   restart: unless-stopped
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+  #   environment:
+  #     - DATABASE_URL=mysql+pymysql://moneydairy_user:moneydairy_password@mysql:3306/moneydairy_db
+  #     - PORT=8000
+  #     - ENVIRONMENT=development
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ../backend:/app
+  #   networks:
+  #     - moneydairy-network
+  #   command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Servicio para el frontend (Astro con React)
-  frontend:
-    build:
-      context: ..
-      dockerfile: ./docker/frontend/Dockerfile
-    container_name: moneydairy-frontend
-    restart: unless-stopped
-    depends_on:
-      - backend
-    ports:
-      - "4321:4321"
-    volumes:
-      - ../frontend:/app
-      - /app/node_modules
-    networks:
-      - moneydairy-network
-    environment:
-      - NODE_ENV=development
-      - BACKEND_URL=http://backend:8000
-    command: pnpm run dev --host 0.0.0.0
+  # # Servicio para el frontend (Astro con React)
+  # frontend:
+  #   build:
+  #     context: ..
+  #     dockerfile: ./docker/frontend/Dockerfile
+  #   container_name: moneydairy-frontend
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - backend
+  #   ports:
+  #     - "4321:4321"
+  #   volumes:
+  #     - ../frontend:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - moneydairy-network
+  #   environment:
+  #     - NODE_ENV=development
+  #     - BACKEND_URL=http://backend:8000
+  #   command: pnpm run dev --host 0.0.0.0
 
 # Volúmenes persistentes
 volumes:
