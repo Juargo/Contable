@@ -4,7 +4,7 @@
   "description": "Aplicación para gestión contable",
   "scripts": {
     "frontend:dev": "cd frontend && pnpm run dev",
-    "backend:dev": "cd backend && python main.py",
+    "backend:dev": "cd backend && python3 main.py",
     "dev": "concurrently \"pnpm run frontend:dev\" \"pnpm run backend:dev\""
   },
   "devDependencies": {
@@ -12,6 +12,6 @@
   },
   "packageManager": "pnpm@10.6.5",
   "dependencies": {
-    "@astrojs/react": "^3.0.0"
+    "@astrojs/react": "^3.6.3"
   }
 }
