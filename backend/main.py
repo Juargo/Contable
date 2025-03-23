@@ -14,6 +14,7 @@ from database.connection import close_db, init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
+from config.cors import setup_cors
 
 
 @asynccontextmanager
@@ -26,22 +27,13 @@ async def lifespan(_app: FastAPI):
     await close_db()
 
 app = FastAPI(
-    title="MoneyDairy API",
+    title="Contable API",
     description="API para la aplicación de gestión financiera MoneyDairy",
     lifespan=lifespan
 )
 
 # Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:4321",
-    ],  # Orígenes permitidos
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+setup_cors(app)
 
 # Registrar Tortoise
 register_tortoise(
