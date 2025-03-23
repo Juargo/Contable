@@ -1,5 +1,10 @@
 """Archivo principal de la API"""
 
+import os
+import sys
+# Agregar el directorio actual al PYTHONPATH
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 from contextlib import asynccontextmanager
 
 import uvicorn

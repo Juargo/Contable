@@ -4,8 +4,8 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException
 
-from ..database.models import Bank
-from ..database.schemas import Bank_Pydantic
+from database.models import Bank
+from database.schemas import Bank_Pydantic, BankIn_Pydantic
 
 router = APIRouter(tags=["Banks"])
 
