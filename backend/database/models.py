@@ -9,10 +9,11 @@ class Bank(models.Model):
     description = fields.CharField(max_length=255, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
-    
+
     class Meta:
+        """Metadatos del modelo"""
         table = "banks"
-    
+
     def __str__(self):
         return self.name
 
@@ -23,10 +24,11 @@ class Category(models.Model):
     parent = fields.ForeignKeyField('models.Category', related_name='subcategories', null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
-    
+
     class Meta:
+        """Metadatos del modelo"""
         table = "categories"
-    
+
     def __str__(self):
         return self.name
 
@@ -36,11 +38,12 @@ class CategoryKeyword(models.Model):
     category = fields.ForeignKeyField('models.Category', related_name='keywords')
     keyword = fields.CharField(max_length=100)
     created_at = fields.DatetimeField(auto_now_add=True)
-    
+
     class Meta:
+        """Metadatos del modelo"""
         table = "category_keywords"
         unique_together = (("category_id", "keyword"),)
-    
+
     def __str__(self):
         return self.keyword
 
@@ -54,9 +57,10 @@ class Transaction(models.Model):
     bank = fields.ForeignKeyField('models.Bank', related_name='transactions', null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
-    
+
     class Meta:
+        """Metadatos del modelo"""
         table = "transactions"
-    
+
     def __str__(self):
         return f"{self.transaction_date} - {self.description} - {self.amount}"

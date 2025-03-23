@@ -83,7 +83,7 @@ export default function ContableApp() {
     
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('bank_name', selectedBank);
+    formData.append('bank_id', selectedBank);
 
     try {
       const response = await fetch(`${API_URL}/upload-bank-report`, {
