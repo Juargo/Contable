@@ -35,6 +35,8 @@ export default function ContableApp() {
   const [loadingBanks, setLoadingBanks] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
   const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
+  const [savingTransactions, setSavingTransactions] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -125,6 +127,50 @@ export default function ContableApp() {
     }
   };
 
+  const handleSaveTransactions = async () => {
+    if (!data.length) {
+      setSaveStatus('No hay transacciones para guardar');
+      return;
+    }
+
+    setSavingTransactions(true);
+    setSaveStatus('Guardando transacciones...');
+
+    try {
+      // Convertir el formato de las transacciones para el endpoint bulk-transactions
+      const transactionsToSave = data.map(item => ({
+        fecha: item.Fecha || item.date,
+        descripcion: item.Descripción || item.description,
+        monto: Number(item.Cargo || item.amount),
+        categoria: "Sin clasificar",
+        banco_id: selectedBankId
+      }));
+
+      const response = await fetch(`${API_URL}/bulk-transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactionsToSave),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error al guardar las transacciones');
+      }
+
+      const result = await response.json();
+      setSaveStatus(`Transacciones guardadas: ${result.insertadas} de ${result.total_recibidas} (${result.duplicadas} duplicadas)`);
+      
+      // Opcional: Recargar todas las transacciones para mostrar las recién guardadas
+      fetchTransactions();
+    } catch (err: any) {
+      setSaveStatus(`Error: ${err.message}`);
+    } finally {
+      setSavingTransactions(false);
+    }
+  };
+
   if (loading) return <div>Cargando datos...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -184,7 +230,25 @@ export default function ContableApp() {
         </div>
       )}
       
-      <h2>Transacciones</h2>
+      <div className="transactions-header">
+        <h2>Transacciones</h2>
+        {data.length > 0 && (
+          <button 
+            onClick={handleSaveTransactions} 
+            disabled={savingTransactions}
+            className="save-button"
+          >
+            {savingTransactions ? 'Guardando...' : 'Guardar en Base de Datos'}
+          </button>
+        )}
+      </div>
+      
+      {saveStatus && (
+        <div className={`save-status ${saveStatus.includes('Error') ? 'error' : 'success'}`}>
+          {saveStatus}
+        </div>
+      )}
+      
       <table>
         <thead>
           <tr>
@@ -262,6 +326,50 @@ export default function ContableApp() {
         
         .upload-status.error {
           background-color: #ffebee;
+          color: #c62828;
+        }
+        
+        .transactions-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+        
+        .save-button {
+          background-color: #4caf50;
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: bold;
+          transition: background-color 0.2s;
+        }
+        
+        .save-button:hover {
+          background-color: #388e3c;
+        }
+        
+        .save-button:disabled {
+          background-color: #a5d6a7;
+          cursor: not-allowed;
+        }
+        
+        .save-status {
+          margin: 0.5rem 0 1rem;
+          padding: 0.5rem;
+          border-radius: 4px;
+        }
+        
+        .save-status.success {
+          background-color: #e8f5e9;
+          border-left: 4px solid #4caf50;
+        }
+        
+        .save-status.error {
+          background-color: #ffebee;
+          border-left: 4px solid #f44336;
           color: #c62828;
         }
         
