@@ -4,12 +4,16 @@ import logging
 import os
 import sys
 import tempfile
-from typing import List
+import math
+import json
+from typing import List, Dict, Any, Union
 
 import pandas as pd
+import numpy as np
 from database.models import Transaction
 from database.schemas import Transaction_Pydantic, TransactionIn_Pydantic
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -43,6 +47,32 @@ async def create_transaction(transaction: TransactionIn_Pydantic):
     transaction_obj = await Transaction.create(**transaction.dict(exclude_unset=True))
     return await Transaction_Pydantic.from_tortoise_orm(transaction_obj)
 
+
+def sanitize_json_data(obj: Any) -> Any:
+    """
+    Convierte valores no serializables en JSON (como NaN, Infinity) a valores compatibles.
+    También convierte numpy.int64/float64 a tipos Python nativos para serialización.
+    """
+    if isinstance(obj, dict):
+        return {k: sanitize_json_data(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_json_data(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64)):
+        num = float(obj)
+        if math.isnan(num):
+            return None
+        elif math.isinf(num):
+            return None  # o podrías usar str(num) para mantener "inf"/"-inf" como cadena
+        else:
+            return num
+    elif isinstance(obj, (pd.Timestamp, pd._libs.tslibs.timestamps.Timestamp)):
+        return obj.isoformat()
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
 
 @router.post("/upload-bank-report")
 async def upload_bank_report(
@@ -85,9 +115,19 @@ async def upload_bank_report(
             raise HTTPException(
                 status_code=400, detail=f"ID de banco no válido: {bank_id}"
             )
-
-        return {"bank_id": bank_id, "balance": saldo, "transactions": movimientos}
+        
+        # Sanitizar datos para evitar errores de serialización JSON
+        response_data = {
+            "bank_id": bank_id,
+            "balance": saldo,
+            "transactions": movimientos
+        }
+        
+        sanitized_data = sanitize_json_data(response_data)
+        return sanitized_data
+        
     except Exception as e:
+        logger.error(f"Error al procesar el archivo: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Error al procesar el archivo: {str(e)}"
         )
