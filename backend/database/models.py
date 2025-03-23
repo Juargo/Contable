@@ -1,45 +1,62 @@
-"""Archivo principal de la API"""
+"""Modelos de base de datos usando Tortoise ORM"""
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-from api.transactions import router as transactions_router
-from tortoise.contrib.fastapi import register_tortoise
+from tortoise import fields, models
 
-app = FastAPI(
-    title="MoneyDairy API",
-    description="API para la aplicación de gestión financiera MoneyDairy",
-)
+class Bank(models.Model):
+    """Modelo para la tabla de bancos"""
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=50, unique=True)
+    description = fields.CharField(max_length=255, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    class Meta:
+        table = "banks"
+    
+    def __str__(self):
+        return self.name
 
-# Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:4321",
-    ],  # Orígenes permitidos
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class Category(models.Model):
+    """Modelo para la tabla de categorías"""
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=100, unique=True)
+    parent = fields.ForeignKeyField('models.Category', related_name='subcategories', null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    class Meta:
+        table = "categories"
+    
+    def __str__(self):
+        return self.name
 
-# Incluir routers
-app.include_router(transactions_router, prefix="/api")
+class CategoryKeyword(models.Model):
+    """Modelo para las palabras clave de categorías"""
+    id = fields.IntField(pk=True)
+    category = fields.ForeignKeyField('models.Category', related_name='keywords')
+    keyword = fields.CharField(max_length=100)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    
+    class Meta:
+        table = "category_keywords"
+        unique_together = (("category_id", "keyword"),)
+    
+    def __str__(self):
+        return self.keyword
 
-# Configurar Tortoise ORM
-register_tortoise(
-    app,
-    db_url='sqlite://db.sqlite3',
-    modules={'models': ['database.models']},
-    generate_schemas=True,
-    add_exception_handlers=True,
-)
-
-@app.get("/")
-async def read_root():
-    """Ruta raíz de la API"""
-    return {"message": "Bienvenido a la API de MoneyDairy"}
-
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+class Transaction(models.Model):
+    """Modelo para la tabla de transacciones"""
+    id = fields.IntField(pk=True)
+    transaction_date = fields.DateField()
+    description = fields.TextField()
+    amount = fields.DecimalField(max_digits=10, decimal_places=2)
+    category = fields.CharField(max_length=100, default="Sin clasificar")
+    bank = fields.ForeignKeyField('models.Bank', related_name='transactions', null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    class Meta:
+        table = "transactions"
+    
+    def __str__(self):
+        return f"{self.transaction_date} - {self.description} - {self.amount}"

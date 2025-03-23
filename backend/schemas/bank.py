@@ -1,7 +1,6 @@
 """Esquemas para bancos"""
 
-from pydantic import BaseModel
-from database.models import Bank_Pydantic, BankIn_Pydantic
+from ..database.schemas import Bank_Pydantic, BankIn_Pydantic
 
 # Utilizamos los esquemas generados automáticamente por Tortoise
 BankSchema = Bank_Pydantic

@@ -1,8 +1,11 @@
 """Módulo para manejar operaciones relacionadas con bancos"""
 
-from fastapi import APIRouter, HTTPException
 from typing import List
-from database.models import Bank, Bank_Pydantic, BankIn_Pydantic
+
+from fastapi import APIRouter, HTTPException
+
+from ..database.models import Bank
+from ..database.schemas import Bank_Pydantic
 
 router = APIRouter(tags=["Banks"])
 
@@ -18,9 +21,3 @@ async def get_bank(bank_id: int):
     if not bank:
         raise HTTPException(status_code=404, detail="Banco no encontrado")
     return await Bank_Pydantic.from_tortoise_orm(bank)
-
-@router.post("/banks", response_model=Bank_Pydantic)
-async def create_bank(bank: BankIn_Pydantic):
-    """Crea un nuevo banco"""
-    bank_obj = await Bank.create(**bank.dict(exclude_unset=True))
-    return await Bank_Pydantic.from_tortoise_orm(bank_obj)

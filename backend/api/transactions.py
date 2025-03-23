@@ -1,8 +1,11 @@
 """Módulo para manejar operaciones relacionadas con transacciones"""
 
-from fastapi import APIRouter, HTTPException
 from typing import List
-from database.models import Transaction, Transaction_Pydantic, TransactionIn_Pydantic
+
+from fastapi import APIRouter, HTTPException
+
+from ..database.models import Transaction
+from ..database.schemas import Transaction_Pydantic
 
 router = APIRouter(tags=["Transactions"])
 
@@ -20,7 +23,7 @@ async def get_transaction(transaction_id: int):
     return await Transaction_Pydantic.from_tortoise_orm(transaction)
 
 @router.post("/transactions", response_model=Transaction_Pydantic)
-async def create_transaction(transaction: TransactionIn_Pydantic):
+async def create_transaction(transaction: any):
     """Crea una nueva transacción"""
     transaction_obj = await Transaction.create(**transaction.dict(exclude_unset=True))
     return await Transaction_Pydantic.from_tortoise_orm(transaction_obj)
