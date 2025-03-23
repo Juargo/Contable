@@ -6,14 +6,16 @@ import sys
 import tempfile
 import math
 import json
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
+from datetime import date, datetime
 
 import pandas as pd
 import numpy as np
 from database.models import Transaction
 from database.schemas import Transaction_Pydantic, TransactionIn_Pydantic
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Body
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -429,3 +431,97 @@ def extraer_datos_bci(archivo):
     except (pd.errors.EmptyDataError, pd.errors.ParserError, FileNotFoundError) as e:
         print(f"Error al procesar archivo de BCI: {e}")
         return 0, []
+
+
+# Modelo para recibir transacciones en masa
+class TransactionInput(BaseModel):
+    fecha: Union[str, date, datetime]
+    descripcion: str
+    monto: float
+    categoria: Optional[str] = "Sin clasificar"
+    banco_id: Optional[int] = None
+
+class BulkTransactionResponse(BaseModel):
+    total_recibidas: int
+    insertadas: int
+    duplicadas: int
+    transacciones_insertadas: List[Transaction_Pydantic]
+
+@router.post("/bulk-transactions", response_model=BulkTransactionResponse)
+async def create_bulk_transactions(transactions: List[TransactionInput] = Body(...)):
+    """
+    Inserta múltiples transacciones evitando duplicados.
+    
+    Recibe un array de transacciones y las inserta en la base de datos,
+    verificando que no existan duplicados por fecha, descripción y monto.
+    
+    Returns:
+        Un resumen con el total de transacciones recibidas, insertadas y duplicadas.
+    """
+    if not transactions:
+        raise HTTPException(status_code=400, detail="No se recibieron transacciones")
+    
+    # Convertimos todas las fechas al formato de la base de datos
+    processed_transactions = []
+    for t in transactions:
+        # Convertir la fecha si viene como string
+        if isinstance(t.fecha, str):
+            try:
+                # Intentar varios formatos de fecha comunes
+                for date_format in ['%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y', '%m/%d/%Y']:
+                    try:
+                        parsed_date = datetime.strptime(t.fecha, date_format).date()
+                        break
+                    except ValueError:
+                        continue
+                else:  # Si ningún formato funciona
+                    raise ValueError(f"Formato de fecha no reconocido: {t.fecha}")
+            except Exception as e:
+                logger.error(f"Error al procesar fecha {t.fecha}: {str(e)}")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Error en formato de fecha: {t.fecha}. Use formato YYYY-MM-DD."
+                )
+        else:
+            # Si es datetime, convertir a date
+            if isinstance(t.fecha, datetime):
+                parsed_date = t.fecha.date()
+            else:
+                parsed_date = t.fecha
+                
+        processed_transactions.append({
+            "transaction_date": parsed_date,
+            "description": t.descripcion,
+            "amount": t.monto,
+            "category": t.categoria,
+            "bank_id": t.banco_id
+        })
+    
+    # Verificar duplicados y crear nuevas transacciones
+    inserted_transactions = []
+    duplicates_count = 0
+    
+    for trans_data in processed_transactions:
+        # Buscar si ya existe una transacción igual por fecha, descripción y monto
+        existing = await Transaction.filter(
+            transaction_date=trans_data["transaction_date"],
+            description=trans_data["description"],
+            amount=trans_data["amount"]
+        ).first()
+        
+        if existing:
+            duplicates_count += 1
+            logger.info(f"Transacción duplicada: {trans_data}")
+            continue
+        
+        # Si no existe, crear nueva transacción
+        transaction_obj = await Transaction.create(**trans_data)
+        trans_pydantic = await Transaction_Pydantic.from_tortoise_orm(transaction_obj)
+        inserted_transactions.append(trans_pydantic)
+        
+    return {
+        "total_recibidas": len(transactions),
+        "insertadas": len(inserted_transactions),
+        "duplicadas": duplicates_count,
+        "transacciones_insertadas": inserted_transactions
+    }

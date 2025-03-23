@@ -1,16 +1,28 @@
-"""Esquemas Pydantic para los modelos de la base de datos"""
+"""Schemas para validación y serialización usando Pydantic"""
 
+from typing import Optional
+from datetime import date
 from tortoise.contrib.pydantic import pydantic_model_creator
-from .models import Bank, Category, CategoryKeyword, Transaction
+from pydantic import BaseModel
 
-# Esquemas para Bank
+from database.models import Transaction, Bank, Category, CategoryKeyword
+
+# Crea schemas Pydantic a partir de modelos Tortoise
+Transaction_Pydantic = pydantic_model_creator(Transaction, name="Transaction")
+TransactionIn_Pydantic = pydantic_model_creator(
+    Transaction, 
+    name="TransactionIn", 
+    exclude_readonly=True
+)
+
 Bank_Pydantic = pydantic_model_creator(Bank, name="Bank")
 BankIn_Pydantic = pydantic_model_creator(Bank, name="BankIn", exclude_readonly=True)
 
-# Esquemas para Category
 Category_Pydantic = pydantic_model_creator(Category, name="Category")
 CategoryIn_Pydantic = pydantic_model_creator(
-    Category, name="CategoryIn", exclude_readonly=True
+    Category, 
+    name="CategoryIn", 
+    exclude_readonly=True
 )
 
 # Esquemas para CategoryKeyword
@@ -19,12 +31,6 @@ CategoryKeyword_Pydantic = pydantic_model_creator(
 )
 CategoryKeywordIn_Pydantic = pydantic_model_creator(
     CategoryKeyword, name="CategoryKeywordIn", exclude_readonly=True
-)
-
-# Esquemas para Transaction
-Transaction_Pydantic = pydantic_model_creator(Transaction, name="Transaction")
-TransactionIn_Pydantic = pydantic_model_creator(
-    Transaction, name="TransactionIn", exclude_readonly=True
 )
 
 # Para facilitar las importaciones
