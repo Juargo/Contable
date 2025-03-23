@@ -1,42 +1,77 @@
 import { useState, useEffect } from 'react';
+import { API_URL } from '../config/constants';
+
+interface Transaction {
+  date: string;
+  description: string;
+  category: string;
+  amount: number;
+}
+
+interface Bank {
+  id: number;
+  name: string;
+  code?: string;
+}
 
 export default function ContableApp() {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState(null);
-  const [selectedBank, setSelectedBank] = useState('');
-  const [file, setFile] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [selectedBank, setSelectedBank] = useState<string>('');
+  const [file, setFile] = useState<File | null>(null);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(true);
 
   useEffect(() => {
     fetchTransactions();
+    fetchBanks();
   }, []);
 
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/transactions');
+      const response = await fetch(`${API_URL}/transactions`);
       if (!response.ok) {
         throw new Error('Error al cargar los datos');
       }
       const data = await response.json();
       setData(data);
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+  const fetchBanks = async () => {
+    try {
+      setLoadingBanks(true);
+      const response = await fetch(`${API_URL}/banks`);
+      if (!response.ok) {
+        throw new Error('Error al cargar los bancos');
+      }
+      const banksData = await response.json();
+      setBanks(banksData);
+    } catch (err) {
+      console.error('Error fetching banks:', err);
+    } finally {
+      setLoadingBanks(false);
+    }
   };
 
-  const handleBankChange = (e) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleBankChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedBank(e.target.value);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!file || !selectedBank) {
@@ -51,7 +86,7 @@ export default function ContableApp() {
     formData.append('bank_name', selectedBank);
 
     try {
-      const response = await fetch('http://localhost:8000/api/upload-bank-report', {
+      const response = await fetch(`${API_URL}/upload-bank-report`, {
         method: 'POST',
         body: formData,
       });
@@ -67,8 +102,9 @@ export default function ContableApp() {
       setFile(null);
       
       // Resetear el formulario
-      document.getElementById('upload-form').reset();
-    } catch (err) {
+      const form = document.getElementById('upload-form') as HTMLFormElement;
+      if (form) form.reset();
+    } catch (err: any) {
       setUploadStatus(`Error: ${err.message}`);
     }
   };
@@ -88,14 +124,18 @@ export default function ContableApp() {
               value={selectedBank} 
               onChange={handleBankChange}
               required
+              disabled={loadingBanks}
             >
               <option value="">-- Selecciona un banco --</option>
-              <option value="santander">Santander</option>
-              <option value="bbva">BBVA</option>
-              <option value="caixabank">CaixaBank</option>
-              <option value="sabadell">Sabadell</option>
-              <option value="bankinter">Bankinter</option>
-              <option value="ing">ING</option>
+              {loadingBanks ? (
+                <option value="" disabled>Cargando bancos...</option>
+              ) : (
+                banks.map(bank => (
+                  <option key={bank.id} value={bank.id.toString()}>
+                    {bank.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           
@@ -133,7 +173,7 @@ export default function ContableApp() {
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan="4">No hay transacciones disponibles</td>
+              <td colSpan={4}>No hay transacciones disponibles</td>
             </tr>
           ) : (
             data.map((item, index) => (
@@ -148,7 +188,7 @@ export default function ContableApp() {
         </tbody>
       </table>
       
-      <style jsx>{`
+      <style>{`
         .upload-section {
           background-color: #f0f0f0;
           padding: 1.5rem;
