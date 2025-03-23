@@ -4,14 +4,24 @@ import { API_URL } from '../config/constants';
 interface Transaction {
   date: string;
   description: string;
-  category: string;
-  amount: number;
+  category?: string;
+  amount?: number;
+  Fecha?: string;
+  Descripción?: string;
+  Cargo?: number;
+  "N° Operación"?: string;
 }
 
 interface Bank {
   id: number;
   name: string;
   code?: string;
+}
+
+interface BankReport {
+  bank_id: number;
+  balance: number;
+  transactions: Transaction[];
 }
 
 export default function ContableApp() {
@@ -23,6 +33,8 @@ export default function ContableApp() {
   const [file, setFile] = useState<File | null>(null);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loadingBanks, setLoadingBanks] = useState(true);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -96,9 +108,13 @@ export default function ContableApp() {
         throw new Error(errorData.detail || 'Error al procesar el archivo');
       }
 
-      const result = await response.json();
+      const result: BankReport = await response.json();
       setUploadStatus('Reporte procesado correctamente');
-      setData(result);
+      
+      // Actualiza el estado con los datos del reporte
+      setData(result.transactions);
+      setBalance(result.balance);
+      setSelectedBankId(result.bank_id);
       setFile(null);
       
       // Resetear el formulario
@@ -160,14 +176,22 @@ export default function ContableApp() {
         )}
       </div>
       
+      {balance !== null && (
+        <div className="balance-info">
+          <h3>Información del Reporte</h3>
+          <p>Banco: {banks.find(b => b.id === selectedBankId)?.name || `ID: ${selectedBankId}`}</p>
+          <p>Saldo: ${balance.toLocaleString()}</p>
+        </div>
+      )}
+      
       <h2>Transacciones</h2>
       <table>
         <thead>
           <tr>
             <th>Fecha</th>
             <th>Descripción</th>
-            <th>Categoría</th>
-            <th>Importe</th>
+            <th>Cargo</th>
+            <th>Operación</th>
           </tr>
         </thead>
         <tbody>
@@ -178,10 +202,10 @@ export default function ContableApp() {
           ) : (
             data.map((item, index) => (
               <tr key={index}>
-                <td>{item.date}</td>
-                <td>{item.description}</td>
-                <td>{item.category}</td>
-                <td>{item.amount}</td>
+                <td>{item.Fecha || item.date}</td>
+                <td>{item.Descripción || item.description}</td>
+                <td>{item.Cargo || item.amount}</td>
+                <td>{item["N° Operación"] || "-"}</td>
               </tr>
             ))
           )}
@@ -261,6 +285,14 @@ export default function ContableApp() {
         
         tr:hover {
           background-color: #f5f5f5;
+        }
+
+        .balance-info {
+          background-color: #e3f2fd;
+          padding: 1rem;
+          border-radius: 8px;
+          margin-bottom: 1.5rem;
+          border-left: 4px solid #2196f3;
         }
       `}</style>
     </div>
