@@ -153,12 +153,26 @@ def extraer_datos_bancoestado(archivo):
         13:, [0, 1, 2, 3]
     ]  # Fecha, N° Operación, Descripción, Cargo
     df_movimientos.columns = ["Fecha", "N° Operación", "Descripción", "Cargo"]
+    
+    # Filtrar filas que corresponden a subtotales o totales
+    # Típicamente estas filas tienen la palabra "Subtotal", "Total" o están vacías en la columna Fecha
+    df_movimientos = df_movimientos[
+        ~df_movimientos["Descripción"].astype(str).str.contains("Subtotal|SUBTOTAL|Total|TOTAL", na=False)
+    ]
+    
     # Filtrar solo los cargos (valores negativos) y eliminar cargos nulos o cero
     df_movimientos = df_movimientos[
         (pd.to_numeric(df_movimientos["Cargo"], errors="coerce") < 0)
         & (pd.to_numeric(df_movimientos["Cargo"], errors="coerce").notnull())
         & (pd.to_numeric(df_movimientos["Cargo"], errors="coerce") != 0)
     ]
+    
+    # Convertir los cargos a valores positivos
+    df_movimientos["Cargo"] = pd.to_numeric(df_movimientos["Cargo"], errors="coerce").abs()
+    
+    # Filtrar filas donde la fecha no es nula (elimina filas de subtotal adicionales)
+    df_movimientos = df_movimientos[df_movimientos["Fecha"].notna()]
+    
     # Convertir DataFrame a lista de diccionarios
     movimientos_bancoestado = df_movimientos.to_dict(orient="records")
     return saldo_contable, movimientos_bancoestado

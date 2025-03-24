@@ -139,7 +139,7 @@ export default function ContableApp() {
     try {
       // Convertir el formato de las transacciones para el endpoint bulk-transactions
       const transactionsToSave = data.map(item => {
-        // Extraer el monto asegurando que sea número y preservando el signo (negativo para gastos)
+        // Extraer el monto asegurando que sea número y siempre positivo
         let monto = item.Cargo || item.amount;
         // Asegurarse de que sea un número
         if (typeof monto === 'string') {
@@ -147,10 +147,13 @@ export default function ContableApp() {
           monto = parseFloat(monto.replace(/[^\d,-]/g, '').replace(',', '.'));
         }
         
+        // Asegurar que el monto sea positivo usando Math.abs()
+        const montoPositivo = Math.abs(monto || 0);
+        
         return {
           fecha: item.Fecha || item.date,
           descripcion: item.Descripción || item.description,
-          monto: monto,
+          monto: montoPositivo,
           categoria: "Sin clasificar",
           banco_id: selectedBankId
         };
