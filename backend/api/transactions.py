@@ -190,120 +190,140 @@ def extraer_datos_bancochile(archivo):
         logger.info("Usando hoja: %s", sheet_name)
         df = pd.read_excel(xls, sheet_name=sheet_name)
         logger.debug("Dimensiones del DataFrame: %s", df.shape)
-        logger.debug("Primeras 5 filas: \n %s", {df.head()})
+        
         # Variables para seguimiento
         saldo_disponible = None
         header_row = None
-        # Buscar la fila que contiene "Saldo disponible"
-        logger.info("Buscando información de 'Saldo disponible'...")
+        
+        # Buscar la fila que contiene "Saldo disponible" o similar
+        logger.info("Buscando información de saldo disponible...")
         for i, row in df.iterrows():
-            for j, cell in enumerate(row):
-                logger.debug("Fila %d, Columna %d, Valor: %s", i, j, cell)
-                if isinstance(cell, str) and "Saldo disponible" in cell:
-                    saldo_disponible = df.iloc[
-                        i, j + 1
-                    ]  # El valor está en la columna siguiente
-                    logger.info(
-                        "Saldo disponible encontrado en fila %d, columna %d: %s",
-                        i,
-                        j + 1,
-                        saldo_disponible,
-                    )
+            row_str = " ".join([str(cell) for cell in row if isinstance(cell, str)])
+            if "Saldo disponible" in row_str or "Saldo" in row_str:
+                # Buscar el valor numérico en esta fila o en la siguiente
+                for j, cell in enumerate(row):
+                    # Intentar detectar el saldo a la derecha de "Saldo disponible"
+                    if isinstance(cell, (int, float)) and not pd.isna(cell):
+                        saldo_disponible = cell
+                        logger.info(f"Saldo encontrado: {saldo_disponible}")
+                        break
+                    elif isinstance(cell, str) and "Saldo" in cell:
+                        # El saldo podría estar en la columna siguiente
+                        if j + 1 < len(row) and isinstance(row[j + 1], (int, float)):
+                            saldo_disponible = row[j + 1]
+                            logger.info(f"Saldo encontrado en columna siguiente: {saldo_disponible}")
+                            break
+                
+                # Si no se encontró en esta fila, buscar en la siguiente
+                if saldo_disponible is None and i + 1 < len(df):
+                    next_row = df.iloc[i + 1]
+                    for cell in next_row:
+                        if isinstance(cell, (int, float)) and not pd.isna(cell):
+                            saldo_disponible = cell
+                            logger.info(f"Saldo encontrado en fila siguiente: {saldo_disponible}")
+                            break
+                
+                if saldo_disponible is not None:
                     break
 
         if saldo_disponible is None:
-            logger.warning("No se encontró 'Saldo disponible' en el archivo")
+            logger.warning("No se encontró información de saldo en el archivo")
+            saldo_disponible = 0
 
         # Identificar la tabla de movimientos
-        # Buscamos la fila que contiene los encabezados
-        logger.info("Buscando encabezados de tabla de movimientos...")
+        # Buscar encabezados comunes en tablas de movimientos bancarios
+        logger.info("Buscando tabla de movimientos...")
+        encabezados_posibles = ["Fecha", "Descripción", "Monto", "Cargo", "Débito"]
+        
         for i, row in df.iterrows():
-            row_str = " ".join([str(cell) for cell in row if isinstance(cell, str)])
-            logger.debug("Fila %d, Contenido: %s", i, row_str)
-
-            for j, cell in enumerate(row):
-                if isinstance(cell, str) and "Fecha" in cell:
-                    header_row = i
-                    logger.info("Encabezado de tabla encontrado en fila %d", i)
-                    logger.debug("Encabezados: %s", [str(h) for h in df.iloc[i]])
-                    break
-
-            if header_row is not None:
+            row_str = " ".join([str(cell) for cell in row if isinstance(cell, str)]).lower()
+            # Verificar si esta fila contiene al menos dos de los encabezados posibles
+            encabezados_presentes = sum(1 for h in encabezados_posibles if h.lower() in row_str)
+            
+            if encabezados_presentes >= 2:
+                logger.info(f"Posibles encabezados encontrados en fila {i}: {row_str}")
+                header_row = i
                 break
+                
+        # Si no se encontró mediante búsqueda directa, intentar otro enfoque
+        if header_row is None:
+            logger.info("Intentando localizar encabezados mediante análisis de estructura...")
+            # Buscar patrones de estructura típicos de tablas bancarias
+            for i in range(min(20, len(df) - 5)):  # Revisar las primeras 20 filas
+                if df.iloc[i:i+5].notna().sum().mean() > 2:  # Si hay al menos 2 columnas con datos
+                    for j, cell in enumerate(df.iloc[i]):
+                        if isinstance(cell, str) and any(h.lower() in cell.lower() for h in encabezados_posibles):
+                            header_row = i
+                            logger.info(f"Encabezados encontrados en fila {i} mediante análisis estructural")
+                            break
+                    if header_row is not None:
+                        break
 
-        # Extraer los movimientos
+        # Procesar los movimientos si se encontraron encabezados
         if header_row is not None:
-            logger.info("Extrayendo movimientos desde la fila %d", header_row + 1)
-            df_movimientos = df.iloc[header_row + 1 :].copy()
+            logger.info(f"Extrayendo movimientos desde la fila {header_row + 1}")
+            # Extraer y nombrar columnas
+            df_movimientos = df.iloc[header_row + 1:].copy()
+            
+            # Usar los encabezados encontrados como nombres de columna
             df_movimientos.columns = df.iloc[header_row]
-
-            logger.debug("Columnas disponibles: %s", list(df_movimientos.columns))
-
-            # Seleccionamos las columnas de interés
-            columns_interest = ["Fecha", "Descripción", "Cargo"]
-            existing_columns = [
-                col for col in columns_interest if col in df_movimientos.columns
-            ]
-
-            logger.info("Columnas seleccionadas: %s", existing_columns)
-
-            if existing_columns:
-                df_movimientos = df_movimientos[existing_columns]
-
-                # Filtrar solo cargos (valores negativos o columna específica)
-                if "Cargo" in df_movimientos.columns:
-                    # Mostrar ejemplos de valores en la columna Cargo
-                    cargo_examples = df_movimientos["Cargo"].head(10).tolist()
-                    logger.debug(
-                        "Ejemplos de valores en columna Cargo: %s", cargo_examples
-                    )
-
-                    df_movimientos["Cargo_num"] = pd.to_numeric(
-                        df_movimientos["Cargo"], errors="coerce"
-                    )
-                    filtered_df = df_movimientos[
-                        (df_movimientos["Cargo_num"] < 0)
-                        & (df_movimientos["Cargo_num"].notnull())
-                        & (df_movimientos["Cargo_num"] != 0)
-                    ]
-
-                    logger.info("Registros antes del filtrado: %d", len(df_movimientos))
-                    logger.info(
-                        "Registros después del filtrado de cargos negativos: %d",
-                        len(filtered_df),
-                    )
-
-                    df_movimientos = filtered_df
-                    df_movimientos = df_movimientos.drop(
-                        "Cargo_num", axis=1, errors="ignore"
-                    )
-
-                # Convertir DataFrame a lista de diccionarios
-                movimientos_bancochile = df_movimientos.to_dict(orient="records")
-                logger.info(
-                    "Total de movimientos encontrados: %d", len(movimientos_bancochile)
-                )
-
-                # Mostrar ejemplos de movimientos
+            
+            # Buscar columnas relevantes: fecha, descripción, y monto negativo (cargo/débito)
+            columnas_fecha = [col for col in df_movimientos.columns 
+                             if isinstance(col, str) and any(x.lower() in col.lower() for x in ["fecha", "date"])]
+            
+            columnas_descripcion = [col for col in df_movimientos.columns 
+                                   if isinstance(col, str) and any(x.lower() in col.lower() for x in ["descrip", "glosa", "concepto", "detalle"])]
+            
+            columnas_cargo = [col for col in df_movimientos.columns 
+                             if isinstance(col, str) and any(x.lower() in col.lower() for x in ["cargo", "débito", "debito", "monto", "valor"])]
+            
+            logger.info(f"Columnas identificadas - Fecha: {columnas_fecha}, Descripción: {columnas_descripcion}, Cargo: {columnas_cargo}")
+            
+            # Verificar que se encontraron las columnas necesarias
+            if columnas_fecha and columnas_descripcion and columnas_cargo:
+                # Seleccionar las primeras columnas encontradas de cada tipo
+                col_fecha = columnas_fecha[0]
+                col_descripcion = columnas_descripcion[0]
+                col_cargo = columnas_cargo[0]
+                
+                # Crear un DataFrame con las columnas de interés y nombres estandarizados
+                df_final = pd.DataFrame({
+                    "Fecha": df_movimientos[col_fecha],
+                    "Descripción": df_movimientos[col_descripcion],
+                    "Cargo": df_movimientos[col_cargo]
+                })
+                
+                # Eliminar filas con valores nulos en columnas críticas
+                df_final = df_final.dropna(subset=["Fecha", "Cargo"])
+                
+                # Convertir la columna "Cargo" a numérico
+                df_final["Cargo"] = pd.to_numeric(df_final["Cargo"], errors="coerce")
+                
+                # Filtrar solo cargos negativos (gastos)
+                df_cargos = df_final[(df_final["Cargo"] < 0) & (df_final["Cargo"].notna())]
+                
+                # Convertir cargos a valores positivos
+                df_cargos["Cargo"] = df_cargos["Cargo"].abs()
+                
+                logger.info(f"Total de movimientos de cargo encontrados: {len(df_cargos)}")
+                
+                # Convertir a lista de diccionarios
+                movimientos_bancochile = df_cargos.to_dict(orient="records")
+                
                 if movimientos_bancochile:
-                    logger.debug(
-                        "Ejemplo de primer movimiento: %s", movimientos_bancochile[0]
-                    )
+                    logger.debug(f"Ejemplo de primer movimiento: {movimientos_bancochile[0]}")
+                
+                return saldo_disponible, movimientos_bancochile
             else:
-                logger.warning("No se encontraron las columnas de interés en los datos")
-                movimientos_bancochile = []
+                logger.warning("No se encontraron todas las columnas necesarias")
+                return saldo_disponible, []
         else:
-            logger.warning("No se encontraron encabezados de tabla en el archivo")
-            movimientos_bancochile = []
-
-        logger.info(
-            "Procesamiento de Banco Chile completado. Saldo: %s, Movimientos: %d",
-            saldo_disponible,
-            len(movimientos_bancochile),
-        )
-        return saldo_disponible, movimientos_bancochile
-    except (pd.errors.EmptyDataError, pd.errors.ParserError, FileNotFoundError) as e:
-        logger.error("Error al procesar archivo de Banco Chile: %s", e, exc_info=True)
+            logger.warning("No se pudo identificar la tabla de movimientos")
+            return saldo_disponible, []
+            
+    except Exception as e:
+        logger.error(f"Error al procesar archivo de Banco Chile: {str(e)}", exc_info=True)
         return 0, []
 
 
