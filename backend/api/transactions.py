@@ -86,9 +86,9 @@ async def upload_bank_report(
     Recibe y procesa un archivo Excel de banco.
 
     - **file**: Archivo Excel del banco
-    - **bank_id**: ID del banco (1: BancoEstado, 2: BancoChile, 3: Santander, 4: BCI)
+    - **bank_id**: ID del banco (bancoestado, bancochile, bancosantander, bancobci)
 
-    Retorna el saldo contable y los movimientos extraídos del archivo.
+    Retorna el saldo contable y los movimientos extraídos del archivo, distinguiendo entre ingresos y gastos.
     """
     # Verificar que el archivo es un Excel
     if not file.filename.endswith((".xls", ".xlsx")):
@@ -148,30 +148,35 @@ def extraer_datos_bancoestado(archivo):
     df = pd.read_excel(xls, sheet_name=sheet_name)
     # Extraer saldo contable
     saldo_contable = df.iloc[9, 3]
+    
     # Extraer movimientos (a partir de la fila 13 en adelante)
     df_movimientos = df.iloc[
         13:, [0, 1, 2, 3]
-    ]  # Fecha, N° Operación, Descripción, Cargo
-    df_movimientos.columns = ["Fecha", "N° Operación", "Descripción", "Cargo"]
+    ]  # Fecha, N° Operación, Descripción, Cargo/Abono
+    
+    df_movimientos.columns = ["Fecha", "N° Operación", "Descripción", "Monto"]
     
     # Filtrar filas que corresponden a subtotales o totales
-    # Típicamente estas filas tienen la palabra "Subtotal", "Total" o están vacías en la columna Fecha
     df_movimientos = df_movimientos[
         ~df_movimientos["Descripción"].astype(str).str.contains("Subtotal|SUBTOTAL|Total|TOTAL", na=False)
     ]
     
-    # Filtrar solo los cargos (valores negativos) y eliminar cargos nulos o cero
-    df_movimientos = df_movimientos[
-        (pd.to_numeric(df_movimientos["Cargo"], errors="coerce") < 0)
-        & (pd.to_numeric(df_movimientos["Cargo"], errors="coerce").notnull())
-        & (pd.to_numeric(df_movimientos["Cargo"], errors="coerce") != 0)
-    ]
-    
-    # Convertir los cargos a valores positivos
-    df_movimientos["Cargo"] = pd.to_numeric(df_movimientos["Cargo"], errors="coerce").abs()
-    
     # Filtrar filas donde la fecha no es nula (elimina filas de subtotal adicionales)
     df_movimientos = df_movimientos[df_movimientos["Fecha"].notna()]
+    
+    # Convertir montos a numéricos
+    df_movimientos["Monto"] = pd.to_numeric(df_movimientos["Monto"], errors="coerce")
+    
+    # Identificar ingresos y gastos
+    df_movimientos["Tipo"] = df_movimientos["Monto"].apply(
+        lambda x: "Ingreso" if x > 0 else "Gasto" if x < 0 else None
+    )
+    
+    # Filtrar registros con montos válidos y tipos identificados
+    df_movimientos = df_movimientos[df_movimientos["Tipo"].notna()]
+    
+    # Tomar el valor absoluto de los montos
+    df_movimientos["Monto"] = df_movimientos["Monto"].abs()
     
     # Convertir DataFrame a lista de diccionarios
     movimientos_bancoestado = df_movimientos.to_dict(orient="records")
@@ -233,7 +238,7 @@ def extraer_datos_bancochile(archivo):
         # Identificar la tabla de movimientos
         # Buscar encabezados comunes en tablas de movimientos bancarios
         logger.info("Buscando tabla de movimientos...")
-        encabezados_posibles = ["Fecha", "Descripción", "Monto", "Cargo", "Débito"]
+        encabezados_posibles = ["Fecha", "Descripción", "Monto", "Cargo", "Abono", "Débito", "Crédito"]
         
         for i, row in df.iterrows():
             row_str = " ".join([str(cell) for cell in row if isinstance(cell, str)]).lower()
@@ -244,7 +249,7 @@ def extraer_datos_bancochile(archivo):
                 logger.info(f"Posibles encabezados encontrados en fila {i}: {row_str}")
                 header_row = i
                 break
-                
+        
         # Si no se encontró mediante búsqueda directa, intentar otro enfoque
         if header_row is None:
             logger.info("Intentando localizar encabezados mediante análisis de estructura...")
@@ -268,48 +273,73 @@ def extraer_datos_bancochile(archivo):
             # Usar los encabezados encontrados como nombres de columna
             df_movimientos.columns = df.iloc[header_row]
             
-            # Buscar columnas relevantes: fecha, descripción, y monto negativo (cargo/débito)
+            # Buscar columnas relevantes
             columnas_fecha = [col for col in df_movimientos.columns 
                              if isinstance(col, str) and any(x.lower() in col.lower() for x in ["fecha", "date"])]
             
             columnas_descripcion = [col for col in df_movimientos.columns 
                                    if isinstance(col, str) and any(x.lower() in col.lower() for x in ["descrip", "glosa", "concepto", "detalle"])]
             
+            # Buscar columnas para montos (pueden ser cargo/débito o abono/crédito)
             columnas_cargo = [col for col in df_movimientos.columns 
                              if isinstance(col, str) and any(x.lower() in col.lower() for x in ["cargo", "débito", "debito", "monto", "valor"])]
             
-            logger.info(f"Columnas identificadas - Fecha: {columnas_fecha}, Descripción: {columnas_descripcion}, Cargo: {columnas_cargo}")
+            columnas_abono = [col for col in df_movimientos.columns 
+                             if isinstance(col, str) and any(x.lower() in col.lower() for x in ["abono", "crédito", "credito"])]
+            
+            logger.info(f"Columnas identificadas - Fecha: {columnas_fecha}, Descripción: {columnas_descripcion}, Cargo: {columnas_cargo}, Abono: {columnas_abono}")
             
             # Verificar que se encontraron las columnas necesarias
-            if columnas_fecha and columnas_descripcion and columnas_cargo:
+            if columnas_fecha and columnas_descripcion and (columnas_cargo or columnas_abono):
                 # Seleccionar las primeras columnas encontradas de cada tipo
                 col_fecha = columnas_fecha[0]
                 col_descripcion = columnas_descripcion[0]
-                col_cargo = columnas_cargo[0]
                 
-                # Crear un DataFrame con las columnas de interés y nombres estandarizados
+                # Crear un DataFrame base con fecha y descripción
                 df_final = pd.DataFrame({
                     "Fecha": df_movimientos[col_fecha],
                     "Descripción": df_movimientos[col_descripcion],
-                    "Cargo": df_movimientos[col_cargo]
                 })
                 
+                # Procesar cargos (gastos)
+                if columnas_cargo:
+                    col_cargo = columnas_cargo[0]
+                    df_final["Cargo"] = pd.to_numeric(df_movimientos[col_cargo], errors="coerce")
+                else:
+                    df_final["Cargo"] = 0
+                
+                # Procesar abonos (ingresos)
+                if columnas_abono:
+                    col_abono = columnas_abono[0]
+                    df_final["Abono"] = pd.to_numeric(df_movimientos[col_abono], errors="coerce")
+                else:
+                    df_final["Abono"] = 0
+                
+                # Si existe una columna de monto que puede tener valores positivos (abonos) y negativos (cargos)
+                if "Monto" in df_movimientos.columns or any("monto" in str(col).lower() for col in df_movimientos.columns):
+                    col_monto = next((col for col in df_movimientos.columns if "monto" in str(col).lower()), None)
+                    if col_monto:
+                        df_final["Monto"] = pd.to_numeric(df_movimientos[col_monto], errors="coerce")
+                        # Los cargos son negativos, los abonos positivos
+                        df_final["Cargo"] = df_final["Cargo"].fillna(0) + df_final["Monto"].apply(lambda x: abs(x) if x < 0 else 0)
+                        df_final["Abono"] = df_final["Abono"].fillna(0) + df_final["Monto"].apply(lambda x: x if x > 0 else 0)
+                
+                # Determinar el tipo de movimiento (Gasto o Ingreso)
+                df_final["Tipo"] = "Gasto"
+                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"
+                df_final.loc[df_final["Cargo"] > 0, "Tipo"] = "Gasto"
+                
+                # Determinar el monto final
+                df_final["Monto"] = df_final["Abono"].fillna(0) + df_final["Cargo"].fillna(0)
+                
                 # Eliminar filas con valores nulos en columnas críticas
-                df_final = df_final.dropna(subset=["Fecha", "Cargo"])
+                df_final = df_final.dropna(subset=["Fecha", "Monto"])
                 
-                # Convertir la columna "Cargo" a numérico
-                df_final["Cargo"] = pd.to_numeric(df_final["Cargo"], errors="coerce")
-                
-                # Filtrar solo cargos negativos (gastos)
-                df_cargos = df_final[(df_final["Cargo"] < 0) & (df_final["Cargo"].notna())]
-                
-                # Convertir cargos a valores positivos
-                df_cargos["Cargo"] = df_cargos["Cargo"].abs()
-                
-                logger.info(f"Total de movimientos de cargo encontrados: {len(df_cargos)}")
+                # Filtrar solo transacciones con montos != 0
+                df_final = df_final[(df_final["Monto"] != 0) & (df_final["Monto"].notna())]
                 
                 # Convertir a lista de diccionarios
-                movimientos_bancochile = df_cargos.to_dict(orient="records")
+                movimientos_bancochile = df_final[["Fecha", "Descripción", "Monto", "Tipo"]].to_dict(orient="records")
                 
                 if movimientos_bancochile:
                     logger.debug(f"Ejemplo de primer movimiento: {movimientos_bancochile[0]}")
@@ -350,11 +380,12 @@ def extraer_datos_santander(archivo):
         # Buscar las columnas con información de movimientos
         df_movimientos = None
         for i, row in df.iterrows():
+            row_str = str(row.to_string()).lower()
             if any(
-                col in str(row.to_string())
-                for col in ["Fecha", "Detalle", "Monto", "Cargo"]
+                col.lower() in row_str
+                for col in ["Fecha", "Detalle", "Monto", "Cargo", "Abono"]
             ):
-                df_movimientos = df.iloc[i + 1 :].copy()
+                df_movimientos = df.iloc[i + 1:].copy()
                 df_movimientos.columns = df.iloc[i]
                 break
 
@@ -364,39 +395,57 @@ def extraer_datos_santander(archivo):
                 "Fecha": ["Fecha", "FECHA", "Fecha Transacción"],
                 "Detalle": ["Detalle", "DETALLE", "Descripción", "Glosa"],
                 "Cargo": ["Cargo", "CARGO", "Monto Cargo", "Débitos", "Débito"],
+                "Abono": ["Abono", "ABONO", "Monto Abono", "Créditos", "Crédito"]
             }
 
-            selected_columns = []
-            column_names = []
-
+            # Crear diccionario para almacenar las columnas encontradas
+            found_columns = {}
+            
             for target_col, possible_names in column_mapping.items():
                 for col_name in df_movimientos.columns:
                     if any(possible in str(col_name) for possible in possible_names):
-                        selected_columns.append(col_name)
-                        column_names.append(target_col)
+                        found_columns[target_col] = col_name
                         break
-
-            if selected_columns:
-                df_movimientos = df_movimientos[selected_columns]
-                df_movimientos.columns = column_names
-
-                # Filtrar solo cargos (valores negativos) y eliminar cargos nulos o cero
-                if "Cargo" in df_movimientos.columns:
-                    cargo_num = pd.to_numeric(df_movimientos["Cargo"], errors="coerce")
-                    df_movimientos = df_movimientos[
-                        (cargo_num < 0) & (cargo_num.notnull()) & (cargo_num != 0)
-                    ]
-
-                # Convertir DataFrame a lista de diccionarios
-                movimientos_santander = df_movimientos.to_dict(orient="records")
+            
+            # Verificar que tengamos las columnas mínimas necesarias
+            if "Fecha" in found_columns and "Detalle" in found_columns and ("Cargo" in found_columns or "Abono" in found_columns):
+                # Crear DataFrame con columnas estándar
+                df_final = pd.DataFrame()
+                df_final["Fecha"] = df_movimientos[found_columns["Fecha"]]
+                df_final["Descripción"] = df_movimientos[found_columns["Detalle"]]
+                
+                # Inicializar columnas de cargo y abono
+                df_final["Cargo"] = 0
+                df_final["Abono"] = 0
+                
+                # Llenar columnas de cargo y abono si existen
+                if "Cargo" in found_columns:
+                    df_final["Cargo"] = pd.to_numeric(df_movimientos[found_columns["Cargo"]], errors="coerce").fillna(0)
+                
+                if "Abono" in found_columns:
+                    df_final["Abono"] = pd.to_numeric(df_movimientos[found_columns["Abono"]], errors="coerce").fillna(0)
+                
+                # Determinar tipo y monto final
+                df_final["Tipo"] = "Gasto"
+                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"
+                df_final["Monto"] = df_final["Cargo"] + df_final["Abono"]
+                
+                # Filtrar filas con valores nulos en fecha o monto
+                df_final = df_final.dropna(subset=["Fecha", "Monto"])
+                
+                # Filtrar transacciones con monto != 0
+                df_final = df_final[df_final["Monto"] != 0]
+                
+                # Convertir a lista de diccionarios
+                movimientos_santander = df_final[["Fecha", "Descripción", "Monto", "Tipo"]].to_dict(orient="records")
+                return saldo_disponible, movimientos_santander
             else:
-                movimientos_santander = []
+                return saldo_disponible, []
         else:
-            movimientos_santander = []
+            return saldo_disponible, []
 
-        return saldo_disponible, movimientos_santander
-    except (pd.errors.EmptyDataError, pd.errors.ParserError, FileNotFoundError) as e:
-        print(f"Error al procesar archivo de Banco Santander: {e}")
+    except Exception as e:
+        logger.error(f"Error al procesar archivo de Banco Santander: {str(e)}", exc_info=True)
         return 0, []
 
 
@@ -417,54 +466,78 @@ def extraer_datos_bci(archivo):
             row_str = row.to_string().lower()
             if (
                 "fecha" in row_str
-                and "transacción" in row_str
-                and "descripción" in row_str
+                and any(term in row_str for term in ["transacción", "transaccion", "detalle", "descripción"])
+                and any(term in row_str for term in ["cargo", "débito", "abono", "crédito", "monto"])
             ):
                 header_row = i
                 break
 
         if header_row is not None:
-            df_movimientos = df.iloc[header_row + 1 :].copy()
+            df_movimientos = df.iloc[header_row + 1:].copy()
             df_movimientos.columns = df.iloc[header_row]
-
+            
             # Mapear las columnas necesarias
             column_mapping = {
                 "Fecha": ["Fecha", "Fecha Transacción", "FECHA"],
-                "Descripción": ["Descripción", "DESCRIPCION", "Detalle"],
-                "Cargo": ["Cargo", "CARGO", "Monto", "Débito"],
+                "Descripción": ["Descripción", "DESCRIPCION", "Detalle", "Glosa"],
+                "Cargo": ["Cargo", "CARGO", "Débito", "Monto Débito"],
+                "Abono": ["Abono", "ABONO", "Crédito", "Monto Crédito"],
+                "Monto": ["Monto", "MONTO", "Valor"]
             }
-
-            selected_columns = []
-            column_names = []
-
+            
+            # Buscar las columnas en el dataframe
+            found_columns = {}
             for target_col, possible_names in column_mapping.items():
                 for col_name in df_movimientos.columns:
-                    if any(possible in str(col_name) for possible in possible_names):
-                        selected_columns.append(col_name)
-                        column_names.append(target_col)
+                    col_str = str(col_name).lower()
+                    if any(possible.lower() in col_str for possible in possible_names):
+                        found_columns[target_col] = col_name
                         break
-
-            if selected_columns:
-                df_movimientos = df_movimientos[selected_columns]
-                df_movimientos.columns = column_names
-
-                # Filtrar solo cargos (valores no nulos y diferentes de cero)
-                if "Cargo" in df_movimientos.columns:
-                    cargo_num = pd.to_numeric(df_movimientos["Cargo"], errors="coerce")
-                    df_movimientos = df_movimientos[
-                        (cargo_num.notnull()) & (cargo_num != 0)
-                    ]
-
-                # Convertir DataFrame a lista de diccionarios
-                movimientos_bci = df_movimientos.to_dict(orient="records")
+            
+            # Verificar que tenemos las columnas mínimas necesarias
+            if "Fecha" in found_columns and "Descripción" in found_columns and any(k in found_columns for k in ["Cargo", "Abono", "Monto"]):
+                # Crear DataFrame con columnas estandarizadas
+                df_final = pd.DataFrame()
+                df_final["Fecha"] = df_movimientos[found_columns["Fecha"]]
+                df_final["Descripción"] = df_movimientos[found_columns["Descripción"]]
+                
+                # Inicializar columnas numéricas
+                df_final["Cargo"] = 0
+                df_final["Abono"] = 0
+                
+                # Procesar columnas de montos
+                if "Cargo" in found_columns:
+                    df_final["Cargo"] = pd.to_numeric(df_movimientos[found_columns["Cargo"]], errors="coerce").fillna(0)
+                
+                if "Abono" in found_columns:
+                    df_final["Abono"] = pd.to_numeric(df_movimientos[found_columns["Abono"]], errors="coerce").fillna(0)
+                
+                # Si hay una columna de monto que puede contener valores positivos y negativos
+                if "Monto" in found_columns:
+                    montos = pd.to_numeric(df_movimientos[found_columns["Monto"]], errors="coerce").fillna(0)
+                    df_final["Cargo"] += montos.apply(lambda x: abs(x) if x < 0 else 0)
+                    df_final["Abono"] += montos.apply(lambda x: x if x > 0 else 0)
+                
+                # Determinar el tipo de transacción
+                df_final["Tipo"] = "Gasto"
+                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"
+                
+                # Calcular el monto final (positivo para ambos tipos)
+                df_final["Monto"] = df_final["Cargo"] + df_final["Abono"]
+                
+                # Filtrar filas con valores nulos y montos cero
+                df_final = df_final.dropna(subset=["Fecha", "Monto"])
+                df_final = df_final[df_final["Monto"] != 0]
+                
+                # Convertir a lista de diccionarios
+                movimientos_bci = df_final[["Fecha", "Descripción", "Monto", "Tipo"]].to_dict(orient="records")
+                return saldo_bci, movimientos_bci
             else:
-                movimientos_bci = []
+                return saldo_bci, []
         else:
-            movimientos_bci = []
-
-        return saldo_bci, movimientos_bci
-    except (pd.errors.EmptyDataError, pd.errors.ParserError, FileNotFoundError) as e:
-        print(f"Error al procesar archivo de BCI: {e}")
+            return saldo_bci, []
+    except Exception as e:
+        logger.error(f"Error al procesar archivo de BCI: {str(e)}", exc_info=True)
         return 0, []
 
 
