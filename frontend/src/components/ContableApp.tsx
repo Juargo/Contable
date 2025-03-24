@@ -9,6 +9,9 @@ interface Transaction {
   Fecha?: string;
   Descripción?: string;
   Cargo?: number;
+  Abono?: number;
+  Monto?: number;
+  Tipo?: string;
   "N° Operación"?: string;
 }
 
@@ -95,7 +98,6 @@ export default function ContableApp() {
     }
 
     setUploadStatus('Subiendo reporte...');
-    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('bank_id', selectedBank);
@@ -119,7 +121,7 @@ export default function ContableApp() {
       setBalance(result.balance);
       setSelectedBankId(result.bank_id);
       setFile(null);
-      
+
       // Resetear el formulario
       const form = document.getElementById('upload-form') as HTMLFormElement;
       if (form) form.reset();
@@ -140,25 +142,44 @@ export default function ContableApp() {
     try {
       // Convertir el formato de las transacciones para el endpoint bulk-transactions
       const transactionsToSave = data.map(item => {
-        // Extraer el monto asegurando que sea número y siempre positivo
-        let monto = item.Cargo || item.amount;
-        // Asegurarse de que sea un número
-        if (typeof monto === 'string') {
-          // Eliminar cualquier formato de moneda y convertir a número
-          monto = parseFloat(monto.replace(/[^\d,-]/g, '').replace(',', '.'));
+        // Determinar el tipo (Ingreso/Gasto) de la transacción
+        const tipo = item.Tipo || 'Gasto'; // Por defecto es gasto si no se especifica
+        
+        // Obtener el monto de la transacción
+        let monto;
+        if (item.Monto !== undefined) {
+          monto = item.Monto;
+        } else if (item.amount !== undefined) {
+          monto = item.amount;
+        } else if (tipo === 'Ingreso') {
+          monto = item.Abono || 0;
+        } else {
+          monto = item.Cargo || 0;
         }
         
-        // Asegurar que el monto sea positivo usando Math.abs()
-        const montoPositivo = Math.abs(monto || 0);
+        // Ajustar el signo del monto según el tipo
+        // Para gastos: valores negativos, para ingresos: valores positivos
+        const montoAjustado = tipo === 'Gasto' 
+          ? -Math.abs(Number(monto)) 
+          : Math.abs(Number(monto));
+        
+        console.log(`Procesando transacción: ${item.Descripción || item.description}, Tipo: ${tipo}, Monto: ${montoAjustado}`);
         
         return {
           fecha: item.Fecha || item.date,
           descripcion: item.Descripción || item.description,
-          monto: montoPositivo,
+          monto: montoAjustado,
           categoria: "Sin clasificar",
-          banco_id: selectedBankId
+          banco_id: banks.find(b => b.name === selectedBank)?.id,
+          tipo: tipo
         };
       });
+
+      // Verificar que hay transacciones para guardar
+      if (transactionsToSave.length === 0) {
+        setSaveStatus('No hay transacciones válidas para guardar');
+        return;
+      }
 
       const response = await fetch(`${API_URL}/bulk-transactions`, {
         method: 'POST',
@@ -279,8 +300,8 @@ export default function ContableApp() {
           <tr>
             <th>Fecha</th>
             <th>Descripción</th>
-            <th>Cargo</th>
-            <th>Operación</th>
+            <th>Monto</th>
+            <th>Tipo</th>
           </tr>
         </thead>
         <tbody>
@@ -290,11 +311,11 @@ export default function ContableApp() {
             </tr>
           ) : (
             data.map((item, index) => (
-              <tr key={index}>
+              <tr key={index} className={item.Tipo?.toLowerCase() || ''}>
                 <td>{item.Fecha || item.date}</td>
                 <td>{item.Descripción || item.description}</td>
-                <td>{formatAmount(item.Cargo || item.amount)}</td>
-                <td>{item["N° Operación"] || "-"}</td>
+                <td>{formatAmount(item.Monto || item.amount || item.Cargo || item.Abono)}</td>
+                <td>{item.Tipo || "-"}</td>
               </tr>
             ))
           )}
@@ -426,6 +447,22 @@ export default function ContableApp() {
           border-radius: 8px;
           margin-bottom: 1.5rem;
           border-left: 4px solid #2196f3;
+        }
+        
+        tr.ingreso {
+          background-color: rgba(76, 175, 80, 0.1);
+        }
+        
+        tr.ingreso:hover {
+          background-color: rgba(76, 175, 80, 0.2);
+        }
+        
+        tr.gasto {
+          background-color: rgba(244, 67, 54, 0.05);
+        }
+        
+        tr.gasto:hover {
+          background-color: rgba(244, 67, 54, 0.1);
         }
       `}</style>
     </div>

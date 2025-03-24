@@ -8,6 +8,7 @@ interface Transaction {
   amount: number;
   category: string;
   bank_id: number | null;
+  tipo: string; // Campo nuevo para el tipo (Ingreso/Gasto)
 }
 
 interface TransactionGroup {
@@ -218,16 +219,18 @@ export default function TransactionsList() {
                       <th>Categoría</th>
                       <th>Banco</th>
                       <th>Monto</th>
+                      <th>Tipo</th>
                     </tr>
                   </thead>
                   <tbody>
                     {transactions.map(transaction => (
-                      <tr key={transaction.id}>
+                      <tr key={transaction.id} className={transaction.tipo.toLowerCase()}>
                         <td>{formatDate(transaction.transaction_date)}</td>
                         <td>{transaction.description}</td>
                         <td>{transaction.category}</td>
                         <td>{getBankName(transaction.bank_id)}</td>
                         <td className="amount">{formatAmount(transaction.amount)}</td>
+                        <td className={`tipo ${transaction.tipo.toLowerCase()}`}>{transaction.tipo}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -385,6 +388,35 @@ export default function TransactionsList() {
         
         .count {
           text-align: center;
+        }
+        
+        tr.ingreso {
+          background-color: rgba(76, 175, 80, 0.1);
+        }
+        
+        tr.ingreso:hover {
+          background-color: rgba(76, 175, 80, 0.2);
+        }
+        
+        tr.gasto {
+          background-color: rgba(244, 67, 54, 0.05);
+        }
+        
+        tr.gasto:hover {
+          background-color: rgba(244, 67, 54, 0.1);
+        }
+        
+        .tipo {
+          font-weight: 600;
+          text-align: center;
+        }
+        
+        .tipo.ingreso {
+          color: #4caf50;
+        }
+        
+        .tipo.gasto {
+          color: #f44336;
         }
         
         .loading, .error, .no-data {

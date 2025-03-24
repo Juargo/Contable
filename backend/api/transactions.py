@@ -363,7 +363,7 @@ def extraer_datos_santander(archivo):
         # Cargar el archivo Excel
         xls = pd.ExcelFile(archivo)
         sheet_name = xls.sheet_names[0]
-        df = pd.read_excel(xls, sheet_name=sheet_name)
+        df = pd.read_excel(xls, sheet_name=sheet_name)  # Corregido de readexcel a read_excel
 
         # Buscar la primera fila con información de saldo
         saldo_disponible = None
@@ -427,7 +427,7 @@ def extraer_datos_santander(archivo):
                 
                 # Determinar tipo y monto final
                 df_final["Tipo"] = "Gasto"
-                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"
+                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"  # Corregido aquí: cambiado '(' por '['
                 df_final["Monto"] = df_final["Cargo"] + df_final["Abono"]
                 
                 # Filtrar filas con valores nulos en fecha o monto
@@ -581,6 +581,7 @@ class TransactionInput(BaseModel):
     monto: float
     categoria: Optional[str] = "Sin clasificar"
     banco_id: Optional[int] = None
+    tipo: Optional[str] = None  # Agregamos el campo tipo como opcional
 
 class BulkTransactionResponse(BaseModel):
     total_recibidas: int
@@ -633,13 +634,17 @@ async def create_bulk_transactions(transactions: List[TransactionInput] = Body(.
         # Asegurar que el monto sea un valor decimal, respetando el signo
         # Valores negativos para gastos, siguiendo la convención establecida
         monto = float(t.monto)
+        
+        # Determinar el tipo basado en el monto si no viene especificado
+        tipo = t.tipo or ("Gasto" if monto < 0 else "Ingreso")
                 
         processed_transactions.append({
             "transaction_date": parsed_date,
             "description": t.descripcion,
             "amount": monto,  # Preservamos el signo y valor original
             "category": t.categoria,
-            "bank_id": t.banco_id
+            "bank_id": t.banco_id,
+            "tipo": tipo  # Usamos el tipo determinado
         })
     
     # Verificar duplicados y crear nuevas transacciones
@@ -671,7 +676,17 @@ async def create_bulk_transactions(transactions: List[TransactionInput] = Body(.
         "transacciones_insertadas": inserted_transactions
     }
 
-@router.get("/transactions-by-month", response_model=List[Transaction_Pydantic])
+# Agregar este nuevo modelo para la respuesta de transacciones mensuales con tipo
+class TransactionWithType(BaseModel):
+    id: int
+    transaction_date: date
+    description: str
+    amount: float
+    category: Optional[str] = None
+    bank_id: Optional[int] = None
+    tipo: str  # Campo adicional para el tipo (Ingreso/Gasto)
+
+@router.get("/transactions-by-month", response_model=List[TransactionWithType])
 async def get_transactions_by_month(
     month: int = Query(..., ge=1, le=12, description="Mes (1-12)"),
     year: int = Query(..., ge=2000, le=2100, description="Año (2000-2100)")
@@ -702,11 +717,22 @@ async def get_transactions_by_month(
         # Obtener transacciones
         transactions = await Transaction_Pydantic.from_queryset(query)
         
-        # Eliminar decimales en el campo amount
+        # Procesar las transacciones para agregar el campo tipo y formatear los montos
+        processed_transactions = []
         for transaction in transactions:
-            transaction.amount = int(transaction.amount)
+            # Convertir a diccionario para manipulación
+            trans_dict = transaction.dict()
+            
+            # Eliminar decimales en el campo amount
+            trans_dict["amount"] = int(trans_dict["amount"])
+            
+            # Agregar campo tipo basado en el monto
+            trans_dict["tipo"] = "Gasto" if trans_dict["amount"] < 0 else "Ingreso"
+            
+            # Agregar a la lista como instancia del nuevo modelo
+            processed_transactions.append(TransactionWithType(**trans_dict))
         
-        return transactions
+        return processed_transactions
     
     except Exception as e:
         logger.error(f"Error al obtener transacciones por mes: {str(e)}", exc_info=True)
