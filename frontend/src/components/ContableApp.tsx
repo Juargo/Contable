@@ -15,6 +15,7 @@ interface Transaction {
 interface Bank {
   id: number;
   name: string;
+  description: string;
   code?: string;
 }
 
@@ -217,8 +218,8 @@ export default function ContableApp() {
                 <option value="" disabled>Cargando bancos...</option>
               ) : (
                 banks.map(bank => (
-                  <option key={bank.id} value={bank.id.toString()}>
-                    {bank.name}
+                  <option key={bank.id} value={bank.name.toString()}>
+                    {bank.description}
                   </option>
                 ))
               )}

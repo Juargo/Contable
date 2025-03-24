@@ -80,7 +80,7 @@ def sanitize_json_data(obj: Any) -> Any:
 @router.post("/upload-bank-report")
 async def upload_bank_report(
     file: UploadFile = File(...),
-    bank_id: int = Form(...),
+    bank_id: str = Form(...),
 ):
     """
     Recibe y procesa un archivo Excel de banco.
@@ -106,13 +106,13 @@ async def upload_bank_report(
             f.write(contents)
 
         # Procesar el archivo según el ID del banco
-        if bank_id == 2:  # BancoEstado
+        if bank_id == 'bancoestado':  # BancoEstado
             saldo, movimientos = extraer_datos_bancoestado(temp_file.name)
-        elif bank_id == 11:  # BancoChile
+        elif bank_id == 'bancochile':  # BancoChile
             saldo, movimientos = extraer_datos_bancochile(temp_file.name)
-        elif bank_id == 1:  # Santander
+        elif bank_id == 'bancosantander':  # Santander
             saldo, movimientos = extraer_datos_santander(temp_file.name)
-        elif bank_id == 3:  # BCI
+        elif bank_id == 'bancobci':  # BCI
             saldo, movimientos = extraer_datos_bci(temp_file.name)
         else:
             raise HTTPException(
