@@ -1,12 +1,24 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import ContableApp from '../components/ContableApp';
+import TransactionsList from '../components/TransactionsList';
 ---
 
 <Layout title="MoneyDairy - Gestión Financiera">
   <main>
     <h1>MoneyDairy</h1>
-    <ContableApp client:load />
+    
+    <div class="app-container">
+      <section class="upload-section-container">
+        <h2 class="section-title">Agregar Transacciones</h2>
+        <ContableApp client:load />
+      </section>
+      
+      <section class="transactions-section-container">
+        <h2 class="section-title">Transacciones Registradas</h2>
+        <TransactionsList client:load />
+      </section>
+    </div>
   </main>
 </Layout>
 
@@ -14,12 +26,55 @@ import ContableApp from '../components/ContableApp';
   main {
     margin: auto;
     padding: 1.5rem;
-    max-width: 1200px;
+    max-width: 1400px;
   }
+  
   h1 {
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 1.5rem;
     text-align: center;
+    color: #1a237e;
+  }
+  
+  .app-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e0e0e0;
+    color: #333;
+  }
+  
+  .upload-section-container,
+  .transactions-section-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+  }
+  
+  /* Responsive layout */
+  @media (min-width: 1024px) {
+    .app-container {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    main {
+      padding: 1rem;
+    }
+    
+    .upload-section-container,
+    .transactions-section-container {
+      padding: 1rem;
+    }
   }
 </style>

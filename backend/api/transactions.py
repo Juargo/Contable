@@ -13,9 +13,10 @@ import pandas as pd
 import numpy as np
 from database.models import Transaction
 from database.schemas import Transaction_Pydantic, TransactionIn_Pydantic
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Body
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Body, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+import calendar
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -525,3 +526,40 @@ async def create_bulk_transactions(transactions: List[TransactionInput] = Body(.
         "duplicadas": duplicates_count,
         "transacciones_insertadas": inserted_transactions
     }
+
+@router.get("/transactions-by-month", response_model=List[Transaction_Pydantic])
+async def get_transactions_by_month(
+    month: int = Query(..., ge=1, le=12, description="Mes (1-12)"),
+    year: int = Query(..., ge=2000, le=2100, description="Año (2000-2100)")
+):
+    """
+    Obtiene las transacciones de un mes específico.
+    
+    - **month**: Número del mes (1-12)
+    - **year**: Año (formato YYYY)
+    
+    Returns:
+        Lista de transacciones correspondientes al mes y año especificados.
+    """
+    try:
+        # Calcular el último día del mes
+        last_day = calendar.monthrange(year, month)[1]
+        
+        # Crear fechas de inicio y fin para el filtro
+        start_date = date(year, month, 1)
+        end_date = date(year, month, last_day)
+        
+        # Filtrar transacciones por el rango de fechas
+        transactions = await Transaction.filter(
+            transaction_date__gte=start_date,
+            transaction_date__lte=end_date
+        ).order_by('transaction_date')
+        
+        return await Transaction_Pydantic.from_queryset(transactions)
+    
+    except Exception as e:
+        logger.error(f"Error al obtener transacciones por mes: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error al obtener transacciones: {str(e)}"
+        )
