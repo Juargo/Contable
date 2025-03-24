@@ -1,0 +1,26 @@
+{
+  "name": "moneydairy",
+  "version": "1.0.0",
+  "description": "Aplicación para gestión de finanzas personales",
+  "scripts": {
+    "frontend:dev": "cd frontend && pnpm run dev",
+    "backend:dev": "cd backend && python3 main.py",
+    "dev": "concurrently \"pnpm run frontend:dev\" \"pnpm run backend:dev\""
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "concurrently": "^8.0.1",
+    "typescript": "^5.8.2"
+  },
+  "packageManager": "pnpm@10.6.5",
+  "dependencies": {
+    "@astrojs/preact": "^4.0.6",
+    "@astrojs/react": "^3.6.3",
+    "@astrojs/solid-js": "^5.0.5",
+    "@chakra-ui/react": "^3.13.0",
+    "axios": "^1.8.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

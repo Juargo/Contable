@@ -1,0 +1,395 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ContableApp from '../components/ContableApp';
+import TransactionsList from '../components/TransactionsList';
+---
+
+<Layout title="MoneyDairy - Gestión Financiera">
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h1 class="logo">MoneyDairy</h1>
+        <button id="sidebarToggle" class="sidebar-toggle" aria-label="Toggle sidebar">
+          <span class="toggle-icon">☰</span>
+        </button>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <ul class="menu">
+          <li class="menu-item">
+            <button id="dashboardBtn" class="menu-button active">
+              <span class="menu-icon">📊</span>
+              <span class="menu-text">Dashboard</span>
+            </button>
+          </li>
+          <li class="menu-item">
+            <button id="transactionsBtn" class="menu-button">
+              <span class="menu-icon">📝</span>
+              <span class="menu-text">Transacciones</span>
+            </button>
+          </li>
+          <li class="menu-item">
+            <button id="uploadBtn" class="menu-button">
+              <span class="menu-icon">📤</span>
+              <span class="menu-text">Subir Archivo</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <p>© 2023 MoneyDairy</p>
+      </div>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="content-wrapper">
+        <!-- Dashboard Section -->
+        <section id="dashboardSection" class="dashboard-section section-active">
+          <h2 class="section-title">Panel de Control</h2>
+          <div class="dashboard-grid">
+            <div class="upload-section-container" id="uploadSectionMini">
+              <div class="section-header">
+                <h3>Agregar Transacciones</h3>
+                <button class="view-more-btn" id="goToUploadBtn">Ver más</button>
+              </div>
+              <p>Sube reportes bancarios o agrega transacciones manualmente.</p>
+            </div>
+            
+            <div class="transactions-section-container" id="transactionsSectionMini">
+              <div class="section-header">
+                <h3>Transacciones Recientes</h3>
+                <button class="view-more-btn" id="goToTransactionsBtn">Ver todas</button>
+              </div>
+              <p>Gestiona y visualiza todas tus transacciones registradas.</p>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Transactions Section -->
+        <section id="transactionsSection" class="transactions-section">
+          <h2 class="section-title">Transacciones Registradas</h2>
+          <TransactionsList client:load />
+        </section>
+        
+        <!-- Upload Section -->
+        <section id="uploadSection" class="upload-section">
+          <h2 class="section-title">Agregar Transacciones</h2>
+          <ContableApp client:load />
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Script para controlar la navegación entre secciones
+    document.addEventListener('DOMContentLoaded', () => {
+      // Referencias a elementos DOM
+      const sidebar = document.getElementById('sidebar');
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const menuButtons = document.querySelectorAll('.menu-button');
+      const sections = document.querySelectorAll('section');
+      
+      // Botones de navegación
+      const dashboardBtn = document.getElementById('dashboardBtn');
+      const transactionsBtn = document.getElementById('transactionsBtn');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const goToUploadBtn = document.getElementById('goToUploadBtn');
+      const goToTransactionsBtn = document.getElementById('goToTransactionsBtn');
+      
+      // Secciones
+      const dashboardSection = document.getElementById('dashboardSection');
+      const transactionsSection = document.getElementById('transactionsSection');
+      const uploadSection = document.getElementById('uploadSection');
+      
+      // Toggle sidebar en móvil
+      sidebarToggle?.addEventListener('click', () => {
+        sidebar?.classList.toggle('sidebar-collapsed');
+      });
+      
+      // Función para cambiar sección activa
+      const setActiveSection = (sectionId) => {
+        // Desactivar todas las secciones
+        sections.forEach(section => {
+          section.classList.remove('section-active');
+        });
+        
+        // Desactivar todos los botones del menú
+        menuButtons.forEach(button => {
+          button.classList.remove('active');
+        });
+        
+        // Activar sección y botón correspondiente
+        const targetSection = document.getElementById(sectionId);
+        targetSection?.classList.add('section-active');
+        
+        // Activar el botón del menú correspondiente
+        if (sectionId === 'dashboardSection') {
+          dashboardBtn?.classList.add('active');
+        } else if (sectionId === 'transactionsSection') {
+          transactionsBtn?.classList.add('active');
+        } else if (sectionId === 'uploadSection') {
+          uploadBtn?.classList.add('active');
+        }
+        
+        // Cerrar sidebar en móvil después de seleccionar una opción
+        if (window.innerWidth < 768) {
+          sidebar?.classList.add('sidebar-collapsed');
+        }
+      };
+      
+      // Event listeners para botones de navegación
+      dashboardBtn?.addEventListener('click', () => setActiveSection('dashboardSection'));
+      transactionsBtn?.addEventListener('click', () => setActiveSection('transactionsSection'));
+      uploadBtn?.addEventListener('click', () => setActiveSection('uploadSection'));
+      goToUploadBtn?.addEventListener('click', () => setActiveSection('uploadSection'));
+      goToTransactionsBtn?.addEventListener('click', () => setActiveSection('transactionsSection'));
+      
+      // Asegurar que el sidebar se colapse en móvil al cargar
+      if (window.innerWidth < 768) {
+        sidebar?.classList.add('sidebar-collapsed');
+      }
+    });
+  </script>
+</Layout>
+
+<style>
+  /* Dashboard Layout */
+  .dashboard {
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  /* Sidebar Styles */
+  .sidebar {
+    width: 240px;
+    background-color: #1a237e;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    z-index: 100;
+  }
+  
+  .sidebar-collapsed {
+    width: 60px;
+    overflow: hidden;
+  }
+  
+  .sidebar-header {
+    padding: 1.5rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .logo {
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 700;
+    color: white;
+    white-space: nowrap;
+  }
+  
+  .sidebar-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.25rem;
+  }
+  
+  .sidebar-nav {
+    flex: 1;
+    padding: 1rem 0;
+  }
+  
+  .menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .menu-item {
+    margin-bottom: 0.5rem;
+  }
+  
+  .menu-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+  }
+  
+  .menu-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
+  
+  .menu-button.active {
+    color: white;
+    border-left-color: #4caf50;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  
+  .menu-icon {
+    margin-right: 0.5rem;
+    font-size: 1.25rem;
+    min-width: 1.5rem;
+  }
+  
+  .sidebar-footer {
+    padding: 1rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+  }
+  
+  /* Main Content Styles */
+  .main-content {
+    flex: 1;
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    overflow-y: auto;
+  }
+  
+  .content-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .section-title {
+    font-size: 1.75rem;
+    margin-bottom: 1.5rem;
+    color: #333;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 0.5rem;
+  }
+  
+  /* Dashboard Grid */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  .dashboard-section,
+  .transactions-section,
+  .upload-section {
+    display: none;
+  }
+  
+  .section-active {
+    display: block;
+  }
+  
+  .upload-section-container,
+  .transactions-section-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    height: 100%;
+  }
+  
+  .upload-section-container:hover,
+  .transactions-section-container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .section-header h3 {
+    font-size: 1.25rem;
+    margin: 0;
+    color: #333;
+  }
+  
+  .view-more-btn {
+    background-color: #4a66d8;
+    color: white;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.875rem;
+    transition: background-color 0.2s;
+  }
+  
+  .view-more-btn:hover {
+    background-color: #3a56c8;
+  }
+  
+  /* Responsive Styles */
+  @media (max-width: 768px) {
+    .dashboard {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      position: sticky;
+      top: 0;
+      flex-direction: row;
+      height: auto;
+      align-items: center;
+      padding: 0.5rem;
+    }
+    
+    .sidebar-header {
+      padding: 0.5rem;
+      border: none;
+      width: 100%;
+    }
+    
+    .sidebar-toggle {
+      display: block;
+    }
+    
+    .sidebar-nav,
+    .sidebar-footer {
+      display: none;
+    }
+    
+    .sidebar-collapsed .sidebar-toggle {
+      margin-left: auto;
+    }
+    
+    .sidebar:not(.sidebar-collapsed) {
+      position: fixed;
+      height: 100vh;
+      flex-direction: column;
+      z-index: 1000;
+    }
+    
+    .sidebar:not(.sidebar-collapsed) .sidebar-nav,
+    .sidebar:not(.sidebar-collapsed) .sidebar-footer {
+      display: block;
+    }
+    
+    .main-content {
+      padding: 1rem;
+    }
+  }
+</style>
