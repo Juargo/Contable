@@ -550,12 +550,13 @@ async def get_transactions_by_month(
         end_date = date(year, month, last_day)
         
         # Filtrar transacciones por el rango de fechas
-        transactions = await Transaction.filter(
+        query = Transaction.filter(
             transaction_date__gte=start_date,
             transaction_date__lte=end_date
         ).order_by('transaction_date')
         
-        return await Transaction_Pydantic.from_queryset(transactions)
+        # Utilizar from_queryset en lugar de convertir a lista
+        return await Transaction_Pydantic.from_queryset(query)
     
     except Exception as e:
         logger.error(f"Error al obtener transacciones por mes: {str(e)}", exc_info=True)
