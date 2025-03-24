@@ -505,16 +505,46 @@ def extraer_datos_bci(archivo):
                 df_final["Cargo"] = 0
                 df_final["Abono"] = 0
                 
-                # Procesar columnas de montos
+                # Función para convertir strings con formato de moneda chilena a números
+                def parse_chilean_amount(value):
+                    if pd.isna(value):
+                        return 0
+                    
+                    # Si ya es un número, devolverlo directamente
+                    if isinstance(value, (int, float)):
+                        return value
+                    
+                    # Convertir a string si no lo es
+                    value_str = str(value)
+                    
+                    # Reemplazar puntos (separadores de miles) y comas (separadores decimales)
+                    # En Chile: 1.234,56 = 1234.56 en formato inglés
+                    cleaned_value = value_str.replace('.', '').replace(',', '.')
+                    
+                    try:
+                        return float(cleaned_value)
+                    except ValueError:
+                        # Si hay error, intentar extraer solo dígitos y puntos/comas
+                        import re
+                        numeric_chars = re.sub(r'[^\d,.]', '', value_str)
+                        if numeric_chars:
+                            numeric_chars = numeric_chars.replace('.', '').replace(',', '.')
+                            try:
+                                return float(numeric_chars)
+                            except ValueError:
+                                return 0
+                        return 0
+                
+                # Procesar columnas de montos con la nueva función
                 if "Cargo" in found_columns:
-                    df_final["Cargo"] = pd.to_numeric(df_movimientos[found_columns["Cargo"]], errors="coerce").fillna(0)
+                    df_final["Cargo"] = df_movimientos[found_columns["Cargo"]].apply(parse_chilean_amount)
                 
                 if "Abono" in found_columns:
-                    df_final["Abono"] = pd.to_numeric(df_movimientos[found_columns["Abono"]], errors="coerce").fillna(0)
+                    df_final["Abono"] = df_movimientos[found_columns["Abono"]].apply(parse_chilean_amount)
                 
                 # Si hay una columna de monto que puede contener valores positivos y negativos
                 if "Monto" in found_columns:
-                    montos = pd.to_numeric(df_movimientos[found_columns["Monto"]], errors="coerce").fillna(0)
+                    montos = df_movimientos[found_columns["Monto"]].apply(parse_chilean_amount)
                     df_final["Cargo"] += montos.apply(lambda x: abs(x) if x < 0 else 0)
                     df_final["Abono"] += montos.apply(lambda x: x if x > 0 else 0)
                 
@@ -524,6 +554,9 @@ def extraer_datos_bci(archivo):
                 
                 # Calcular el monto final (positivo para ambos tipos)
                 df_final["Monto"] = df_final["Cargo"] + df_final["Abono"]
+                
+                # Registrar algunos montos para verificación
+                logger.debug(f"Ejemplos de montos procesados: {df_final['Monto'].head().tolist()}")
                 
                 # Filtrar filas con valores nulos y montos cero
                 df_final = df_final.dropna(subset=["Fecha", "Monto"])
