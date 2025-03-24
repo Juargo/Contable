@@ -52,9 +52,11 @@ class Transaction(models.Model):
     id = fields.IntField(pk=True)
     transaction_date = fields.DateField()
     description = fields.TextField()
-    amount = fields.DecimalField(max_digits=10, decimal_places=2)
+    amount = fields.DecimalField(max_digits=10, decimal_places=0)
     category = fields.CharField(max_length=100, default="Sin clasificar")
     bank = fields.ForeignKeyField('models.Bank', related_name='transactions', null=True)
+    # La columna currency aún no existe en la base de datos
+    # currency = fields.CharField(max_length=3, default="CLP")
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

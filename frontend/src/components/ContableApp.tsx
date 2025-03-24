@@ -138,13 +138,23 @@ export default function ContableApp() {
 
     try {
       // Convertir el formato de las transacciones para el endpoint bulk-transactions
-      const transactionsToSave = data.map(item => ({
-        fecha: item.Fecha || item.date,
-        descripcion: item.Descripción || item.description,
-        monto: Number(item.Cargo || item.amount),
-        categoria: "Sin clasificar",
-        banco_id: selectedBankId
-      }));
+      const transactionsToSave = data.map(item => {
+        // Extraer el monto asegurando que sea número y preservando el signo (negativo para gastos)
+        let monto = item.Cargo || item.amount;
+        // Asegurarse de que sea un número
+        if (typeof monto === 'string') {
+          // Eliminar cualquier formato de moneda y convertir a número
+          monto = parseFloat(monto.replace(/[^\d,-]/g, '').replace(',', '.'));
+        }
+        
+        return {
+          fecha: item.Fecha || item.date,
+          descripcion: item.Descripción || item.description,
+          monto: monto,
+          categoria: "Sin clasificar",
+          banco_id: selectedBankId
+        };
+      });
 
       const response = await fetch(`${API_URL}/bulk-transactions`, {
         method: 'POST',
@@ -169,6 +179,17 @@ export default function ContableApp() {
     } finally {
       setSavingTransactions(false);
     }
+  };
+
+  // Formatear los montos en CLP
+  const formatAmount = (amount: number | undefined) => {
+    if (amount === undefined) return "-";
+    return amount.toLocaleString('es-CL', { 
+      style: 'currency', 
+      currency: 'CLP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
   };
 
   if (loading) return <div>Cargando datos...</div>;
@@ -226,7 +247,7 @@ export default function ContableApp() {
         <div className="balance-info">
           <h3>Información del Reporte</h3>
           <p>Banco: {banks.find(b => b.id === selectedBankId)?.name || `ID: ${selectedBankId}`}</p>
-          <p>Saldo: ${balance.toLocaleString()}</p>
+          <p>Saldo: {formatAmount(balance)}</p>
         </div>
       )}
       
@@ -268,7 +289,7 @@ export default function ContableApp() {
               <tr key={index}>
                 <td>{item.Fecha || item.date}</td>
                 <td>{item.Descripción || item.description}</td>
-                <td>{item.Cargo || item.amount}</td>
+                <td>{formatAmount(item.Cargo || item.amount)}</td>
                 <td>{item["N° Operación"] || "-"}</td>
               </tr>
             ))

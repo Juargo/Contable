@@ -84,7 +84,9 @@ export default function TransactionsList() {
   const formatAmount = (amount: number) => {
     return amount.toLocaleString('es-CL', { 
       style: 'currency', 
-      currency: 'CLP' 
+      currency: 'CLP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0 
     });
   };
 

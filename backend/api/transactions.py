@@ -489,11 +489,15 @@ async def create_bulk_transactions(transactions: List[TransactionInput] = Body(.
                 parsed_date = t.fecha.date()
             else:
                 parsed_date = t.fecha
+        
+        # Asegurar que el monto sea un valor decimal, respetando el signo
+        # Valores negativos para gastos, siguiendo la convención establecida
+        monto = float(t.monto)
                 
         processed_transactions.append({
             "transaction_date": parsed_date,
             "description": t.descripcion,
-            "amount": t.monto,
+            "amount": monto,  # Preservamos el signo y valor original
             "category": t.categoria,
             "bank_id": t.banco_id
         })
@@ -555,8 +559,14 @@ async def get_transactions_by_month(
             transaction_date__lte=end_date
         ).order_by('transaction_date')
         
-        # Utilizar from_queryset en lugar de convertir a lista
-        return await Transaction_Pydantic.from_queryset(query)
+        # Obtener transacciones
+        transactions = await Transaction_Pydantic.from_queryset(query)
+        
+        # Eliminar decimales en el campo amount
+        for transaction in transactions:
+            transaction.amount = int(transaction.amount)
+        
+        return transactions
     
     except Exception as e:
         logger.error(f"Error al obtener transacciones por mes: {str(e)}", exc_info=True)
