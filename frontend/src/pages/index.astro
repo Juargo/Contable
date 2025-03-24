@@ -8,18 +8,52 @@ import TransactionsList from '../components/TransactionsList';
   <main>
     <h1>MoneyDairy</h1>
     
-    <div class="app-container">
-      <section class="upload-section-container">
-        <h2 class="section-title">Agregar Transacciones</h2>
-        <ContableApp client:load />
+    <div class="app-container" id="appContainer">
+      <section class="upload-section-container" id="uploadSection">
+        <div class="section-header">
+          <h2 class="section-title">Agregar Transacciones</h2>
+          <button class="toggle-btn" id="toggleUploadSection" aria-label="Minimizar sección">
+            <span class="toggle-icon">◀</span>
+          </button>
+        </div>
+        <div class="section-content" id="uploadSectionContent">
+          <ContableApp client:load />
+        </div>
       </section>
       
-      <section class="transactions-section-container">
+      <section class="transactions-section-container" id="transactionsSection">
         <h2 class="section-title">Transacciones Registradas</h2>
         <TransactionsList client:load />
       </section>
     </div>
   </main>
+
+  <script>
+    // Script para manejar el plegado/desplegado de la sección
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleBtn = document.getElementById('toggleUploadSection');
+      const sectionContent = document.getElementById('uploadSectionContent');
+      const sectionContainer = document.getElementById('uploadSection');
+      const appContainer = document.getElementById('appContainer');
+      const transactionsSection = document.getElementById('transactionsSection');
+      const toggleIcon = toggleBtn?.querySelector('.toggle-icon');
+      
+      toggleBtn?.addEventListener('click', () => {
+        sectionContent?.classList.toggle('collapsed');
+        sectionContainer?.classList.toggle('minimized');
+        appContainer?.classList.toggle('left-minimized');
+        transactionsSection?.classList.toggle('expanded');
+        
+        if (sectionContent?.classList.contains('collapsed')) {
+          if (toggleIcon) toggleIcon.textContent = '▶';
+          toggleBtn.setAttribute('aria-label', 'Expandir sección');
+        } else {
+          if (toggleIcon) toggleIcon.textContent = '◀';
+          toggleBtn.setAttribute('aria-label', 'Minimizar sección');
+        }
+      });
+    });
+  </script>
 </Layout>
 
 <style>
@@ -39,31 +73,115 @@ import TransactionsList from '../components/TransactionsList';
   
   .app-container {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 2rem;
+    transition: grid-template-columns 0.5s ease;
+  }
+  
+  .app-container.left-minimized {
+    grid-template-columns: min-content 1fr;
+  }
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e0e0e0;
+    white-space: nowrap;
   }
   
   .section-title {
     font-size: 1.5rem;
     font-weight: 600;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #e0e0e0;
+    margin: 0;
     color: #333;
   }
   
-  .upload-section-container,
+  .toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #555;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+  
+  .toggle-btn:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .toggle-icon {
+    transition: transform 0.3s ease;
+  }
+  
+  .section-content {
+    transition: max-width 0.5s ease, opacity 0.3s ease, padding 0.3s ease;
+    max-width: 800px;
+    width: 100%;
+    opacity: 1;
+    overflow: hidden;
+  }
+  
+  .section-content.collapsed {
+    max-width: 0;
+    opacity: 0;
+    padding-left: 0;
+    padding-right: 0;
+    display: none;
+  }
+  
+  .upload-section-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    min-width: 450px;
+  }
+
+  .upload-section-container.minimized {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    min-width: auto;
+    width: auto;
+    padding: 1rem 0.5rem;
+  }
+  
   .transactions-section-container {
     background-color: white;
     border-radius: 10px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     padding: 1.5rem;
+    transition: all 0.3s ease;
+    width: 100%;
+  }
+  
+  .transactions-section-container.expanded {
+    grid-column: 2;
   }
   
   /* Responsive layout */
-  @media (min-width: 1024px) {
+  @media (max-width: 1024px) {
     .app-container {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
+    }
+    
+    .app-container.left-minimized {
+      grid-template-columns: 1fr;
+    }
+    
+    .upload-section-container.minimized {
+      min-width: 100%;
+    }
+    
+    .section-content.collapsed {
+      display: none;
     }
   }
   
