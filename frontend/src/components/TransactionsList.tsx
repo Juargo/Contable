@@ -10,21 +10,32 @@ interface Transaction {
   bank_id: number | null;
 }
 
+interface TransactionGroup {
+  description: string;
+  total_amount: number;
+  count: number;
+}
+
 interface Bank {
   id: number;
   name: string;
 }
 
+type TabType = 'all' | 'grouped';
+
 export default function TransactionsList() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [groupedTransactions, setGroupedTransactions] = useState<TransactionGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1); // Mes actual (1-12)
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
 
   useEffect(() => {
     fetchTransactionsByMonth();
+    fetchGroupedTransactions();
     fetchBanks();
   }, [month, year]);
 
@@ -46,6 +57,22 @@ export default function TransactionsList() {
     }
   };
 
+  const fetchGroupedTransactions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/transactions-grouped-by-month?month=${month}&year=${year}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar transacciones agrupadas');
+      }
+      
+      const data = await response.json();
+      setGroupedTransactions(data);
+    } catch (err) {
+      console.error('Error al cargar transacciones agrupadas:', err);
+      // No establecemos error global para no afectar la visualización principal
+    }
+  };
+
   const fetchBanks = async () => {
     try {
       const response = await fetch(`${API_URL}/banks`);
@@ -64,6 +91,10 @@ export default function TransactionsList() {
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setYear(parseInt(e.target.value));
+  };
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
   };
 
   const getBankName = (bankId: number | null) => {
@@ -148,7 +179,7 @@ export default function TransactionsList() {
         </div>
       </div>
       
-      {transactions.length > 0 ? (
+      {(transactions.length > 0 || groupedTransactions.length > 0) ? (
         <>
           <div className="summary-card">
             <div className="summary-item">
@@ -160,29 +191,69 @@ export default function TransactionsList() {
               <span className="summary-value">{formatAmount(totalAmount)}</span>
             </div>
           </div>
-        
-          <table className="transactions-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Descripción</th>
-                <th>Categoría</th>
-                <th>Banco</th>
-                <th>Monto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map(transaction => (
-                <tr key={transaction.id}>
-                  <td>{formatDate(transaction.transaction_date)}</td>
-                  <td>{transaction.description}</td>
-                  <td>{transaction.category}</td>
-                  <td>{getBankName(transaction.bank_id)}</td>
-                  <td className="amount">{formatAmount(transaction.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          
+          <div className="tabs-container">
+            <div className="tabs">
+              <button 
+                className={`tab ${activeTab === 'all' ? 'active' : ''}`}
+                onClick={() => handleTabChange('all')}
+              >
+                Transacciones
+              </button>
+              <button 
+                className={`tab ${activeTab === 'grouped' ? 'active' : ''}`}
+                onClick={() => handleTabChange('grouped')}
+              >
+                Gastos Agrupados
+              </button>
+            </div>
+            
+            <div className="tab-content">
+              {activeTab === 'all' ? (
+                <table className="transactions-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Descripción</th>
+                      <th>Categoría</th>
+                      <th>Banco</th>
+                      <th>Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map(transaction => (
+                      <tr key={transaction.id}>
+                        <td>{formatDate(transaction.transaction_date)}</td>
+                        <td>{transaction.description}</td>
+                        <td>{transaction.category}</td>
+                        <td>{getBankName(transaction.bank_id)}</td>
+                        <td className="amount">{formatAmount(transaction.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="grouped-table">
+                  <thead>
+                    <tr>
+                      <th>Descripción</th>
+                      <th>Cantidad</th>
+                      <th>Monto Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupedTransactions.map((group, index) => (
+                      <tr key={index}>
+                        <td>{group.description}</td>
+                        <td className="count">{group.count}</td>
+                        <td className="amount">{formatAmount(group.total_amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </>
       ) : (
         <div className="no-data">
@@ -249,10 +320,46 @@ export default function TransactionsList() {
           color: #1a237e;
         }
         
-        .transactions-table {
+        .tabs-container {
+          margin-top: 1rem;
+        }
+        
+        .tabs {
+          display: flex;
+          border-bottom: 2px solid #e0e0e0;
+          margin-bottom: 1rem;
+        }
+        
+        .tab {
+          padding: 0.75rem 1.5rem;
+          background: none;
+          border: none;
+          border-bottom: 3px solid transparent;
+          cursor: pointer;
+          font-weight: 600;
+          color: #757575;
+          font-size: 1rem;
+          transition: all 0.2s ease;
+        }
+        
+        .tab:hover {
+          color: #1a237e;
+          background-color: #f5f5f5;
+        }
+        
+        .tab.active {
+          color: #1a237e;
+          border-bottom-color: #1a237e;
+        }
+        
+        .tab-content {
+          padding: 1rem 0;
+        }
+        
+        .transactions-table,
+        .grouped-table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 1rem;
           font-size: 0.9rem;
         }
         
@@ -274,6 +381,10 @@ export default function TransactionsList() {
         .amount {
           font-weight: 600;
           text-align: right;
+        }
+        
+        .count {
+          text-align: center;
         }
         
         .loading, .error, .no-data {

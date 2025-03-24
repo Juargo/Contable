@@ -608,3 +608,74 @@ async def get_transactions_by_month(
             status_code=500, 
             detail=f"Error al obtener transacciones: {str(e)}"
         )
+
+# Agregar este nuevo modelo para la respuesta agrupada
+class TransactionGroup(BaseModel):
+    description: str
+    total_amount: int
+    count: int
+
+@router.get("/transactions-grouped-by-month", response_model=List[TransactionGroup])
+async def get_transactions_grouped_by_month(
+    month: int = Query(..., ge=1, le=12, description="Mes (1-12)"),
+    year: int = Query(..., ge=2000, le=2100, description="Año (2000-2100)")
+):
+    """
+    Obtiene las transacciones de un mes específico agrupadas por descripción.
+    
+    - **month**: Número del mes (1-12)
+    - **year**: Año (formato YYYY)
+    
+    Returns:
+        Lista de transacciones agrupadas por descripción con el total y conteo de cada grupo.
+    """
+    try:
+        # Calcular el último día del mes
+        last_day = calendar.monthrange(year, month)[1]
+        
+        # Crear fechas de inicio y fin para el filtro
+        start_date = date(year, month, 1)
+        end_date = date(year, month, last_day)
+        
+        # Filtrar transacciones por el rango de fechas
+        transactions = await Transaction.filter(
+            transaction_date__gte=start_date,
+            transaction_date__lte=end_date
+        ).values('description', 'amount')
+        
+        # Agrupar por descripción
+        grouped_data = {}
+        for trans in transactions:
+            description = trans['description']
+            amount = trans['amount']
+            
+            if description not in grouped_data:
+                grouped_data[description] = {
+                    'total_amount': 0,
+                    'count': 0
+                }
+            
+            grouped_data[description]['total_amount'] += amount
+            grouped_data[description]['count'] += 1
+        
+        # Formatear los resultados como una lista de objetos
+        result = [
+            {
+                'description': desc,
+                'total_amount': int(data['total_amount']),  # Eliminar decimales
+                'count': data['count']
+            }
+            for desc, data in grouped_data.items()
+        ]
+        
+        # Ordenar por monto total (mayor a menor)
+        result.sort(key=lambda x: x['total_amount'], reverse=True)
+        
+        return result
+    
+    except Exception as e:
+        logger.error(f"Error al obtener transacciones agrupadas: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error al obtener transacciones agrupadas: {str(e)}"
+        )
