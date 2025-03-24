@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount DECIMAL(10, 2) NOT NULL,
     type ENUM('Gasto', 'Ingreso') NOT NULL,
     category VARCHAR(100) DEFAULT 'Sin clasificar',
-    bank_id TEXT,
+    bank_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (bank_id) REFERENCES banks(id)
@@ -80,19 +80,7 @@ INSERT INTO category_keywords (category_id, keyword) VALUES
     (7, 'SUPERMERCADO'),
     (7, 'MERCADONA'),
     (7, 'CARREFOUR'),
-    (8, 'RESTAURANTE'),
-    (8, 'BAR'),
-    (9, 'ELECTRICIDAD'),
-    (9, 'LUZ'),
-    (10, 'INTERNET'),
-    (10, 'FIBRA'),
-    (11, 'GASOLINA'),
-    (11, 'COMBUSTIBLE'),
-    (12, 'METRO'),
-    (12, 'BUS'),
-    (13, 'NOMINA'),
-    (13, 'SALARIO'),
-    (14, 'DEVOLUCION');
+    (8, 'RESTAURANTE');
 
 -- Permisos
 GRANT ALL PRIVILEGES ON moneydairy_db.* TO 'moneydairy_user'@'%';
