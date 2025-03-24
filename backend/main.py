@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from api.banks import router as banks_router
 from api.transactions import router as transactions_router
+from api.income_transactions import router as income_transactions_router  # Agregar esta línea
 from database.connection import close_db, init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,7 @@ register_tortoise(
 
 # Incluir routers
 app.include_router(transactions_router, prefix="/api")
+app.include_router(income_transactions_router, prefix="/api")  # Agregar esta línea
 app.include_router(banks_router, prefix="/api")
 
 
