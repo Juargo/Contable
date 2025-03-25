@@ -799,6 +799,7 @@ class TransactionGroup(BaseModel):
     description: str
     total_amount: int
     count: int
+    bank_id: Optional[int] = None
 
 @router.get("/transactions-grouped-by-month", response_model=List[TransactionGroup])
 async def get_transactions_grouped_by_month(
@@ -813,6 +814,7 @@ async def get_transactions_grouped_by_month(
     
     Returns:
         Lista de transacciones agrupadas por descripción con el total y conteo de cada grupo.
+        Incluye el ID del banco asociado a cada grupo de transacciones.
     """
     try:
         # Calcular el último día del mes
@@ -826,31 +828,38 @@ async def get_transactions_grouped_by_month(
         transactions = await Transaction.filter(
             transaction_date__gte=start_date,
             transaction_date__lte=end_date
-        ).values('description', 'amount')
+        ).values('description', 'amount', 'bank_id')
         
-        # Agrupar por descripción
+        # Agrupar por descripción y banco
         grouped_data = {}
         for trans in transactions:
             description = trans['description']
             amount = trans['amount']
+            bank_id = trans['bank_id']
             
-            if description not in grouped_data:
-                grouped_data[description] = {
+            # Crear clave compuesta con descripción y banco
+            group_key = f"{description}_{bank_id}"
+            
+            if group_key not in grouped_data:
+                grouped_data[group_key] = {
+                    'description': description,
+                    'bank_id': bank_id,
                     'total_amount': 0,
                     'count': 0
                 }
             
-            grouped_data[description]['total_amount'] += amount
-            grouped_data[description]['count'] += 1
+            grouped_data[group_key]['total_amount'] += amount
+            grouped_data[group_key]['count'] += 1
         
         # Formatear los resultados como una lista de objetos
         result = [
             {
-                'description': desc,
+                'description': data['description'],
                 'total_amount': int(data['total_amount']),  # Eliminar decimales
-                'count': data['count']
+                'count': data['count'],
+                'bank_id': data['bank_id']
             }
-            for desc, data in grouped_data.items()
+            for group_key, data in grouped_data.items()
         ]
         
         # Ordenar por monto total (mayor a menor)
