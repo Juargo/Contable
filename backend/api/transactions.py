@@ -302,98 +302,115 @@ def extraer_datos_bancochile_formato1(df):
                 break
         
         if header_row is not None:
-            # Extraer datos desde la fila siguiente a los encabezados
-            data_df = df.iloc[header_row+1:].copy()
-            data_df.columns = df.iloc[header_row]
-            
-            # Identificar columnas relevantes
-            cols = {
-                'fecha': None,
-                'descripcion': None,
-                'cargo': None,
-                'abono': None,
-                'monto': None
-            }
-            
-            # Mapear columnas detectadas
-            for col in data_df.columns:
-                col_str = str(col).lower()
-                if 'fecha' in col_str:
-                    cols['fecha'] = col
-                elif any(x in col_str for x in ['descripción', 'descripcion', 'glosa', 'detalle']):
-                    cols['descripcion'] = col
-                elif any(x in col_str for x in ['cargo', 'débito', 'debito']):
-                    cols['cargo'] = col
-                elif any(x in col_str for x in ['abono', 'crédito', 'credito']):
-                    cols['abono'] = col
-                elif 'monto' in col_str:
-                    cols['monto'] = col
-            
-            # Si no se encontró columna de fecha, usar la primera columna
-            if cols['fecha'] is None and len(data_df.columns) > 0:
-                cols['fecha'] = data_df.columns[0]
-            
-            # Si no se encontró descripción, usar la segunda columna
-            if cols['descripcion'] is None and len(data_df.columns) > 1:
-                cols['descripcion'] = data_df.columns[1]
-            
-            # Crear DataFrame normalizado
-            result_df = pd.DataFrame()
-            
-            # Procesar fechas y descripciones
-            if cols['fecha'] and cols['descripcion']:
-                result_df['Fecha'] = data_df[cols['fecha']]
-                result_df['Descripción'] = data_df[cols['descripcion']]
+            # Verificar que hay suficientes filas para procesar después del encabezado
+            if header_row + 1 < len(df):
+                # Extraer datos desde la fila siguiente a los encabezados
+                data_df = df.iloc[header_row+1:].copy()
                 
-                # Procesar montos - diferentes posibles formatos
-                result_df['Cargo'] = 0
-                result_df['Abono'] = 0
+                # Asegurar que las columnas sean válidas antes de asignar
+                valid_columns = []
+                if len(df.iloc[header_row]) == len(data_df.columns):
+                    # Asignar nombres de columnas desde la fila de encabezado
+                    data_df.columns = df.iloc[header_row]
+                else:
+                    # Si hay un problema con las dimensiones, usar nombres genéricos
+                    logger.warning(f"Incompatibilidad en número de columnas. Usando nombres genéricos.")
+                    data_df.columns = [f"Column{i}" for i in range(len(data_df.columns))]
                 
-                # Función para limpiar y convertir montos
-                def parse_monto(valor):
-                    if pd.isna(valor):
-                        return 0
-                    if isinstance(valor, (int, float)):
-                        return float(valor)
-                    # Limpiar strings
-                    valor_str = str(valor).replace('$', '').replace('.', '').replace(',', '.').strip()
-                    try:
-                        return float(valor_str)
-                    except:
-                        return 0
+                # Identificar columnas relevantes
+                cols = {
+                    'fecha': None,
+                    'descripcion': None,
+                    'cargo': None,
+                    'abono': None,
+                    'monto': None
+                }
                 
-                # Procesar cargos y abonos si existen
-                if cols['cargo']:
-                    result_df['Cargo'] = data_df[cols['cargo']].apply(parse_monto)
-                if cols['abono']:
-                    result_df['Abono'] = data_df[cols['abono']].apply(parse_monto)
+                # Mapear columnas detectadas
+                for col in data_df.columns:
+                    col_str = str(col).lower()
+                    if 'fecha' in col_str:
+                        cols['fecha'] = col
+                    elif any(x in col_str for x in ['descripción', 'descripcion', 'glosa', 'detalle']):
+                        cols['descripcion'] = col
+                    elif any(x in col_str for x in ['cargo', 'débito', 'debito']):
+                        cols['cargo'] = col
+                    elif any(x in col_str for x in ['abono', 'crédito', 'credito']):
+                        cols['abono'] = col
+                    elif 'monto' in col_str:
+                        cols['monto'] = col
                 
-                # Si hay una columna de monto único
-                if cols['monto'] and not (cols['cargo'] or cols['abono']):
-                    montos = data_df[cols['monto']].apply(parse_monto)
-                    result_df['Cargo'] = montos.apply(lambda x: abs(x) if x < 0 else 0)
-                    result_df['Abono'] = montos.apply(lambda x: x if x > 0 else 0)
+                # Si no se encontró columna de fecha, usar la primera columna
+                if cols['fecha'] is None and len(data_df.columns) > 0:
+                    cols['fecha'] = data_df.columns[0]
                 
-                # Determinar tipo
-                result_df['Tipo'] = 'Gasto'
-                mask_ingreso = result_df['Abono'] > 0
-                result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
+                # Si no se encontró descripción, usar la segunda columna
+                if cols['descripcion'] is None and len(data_df.columns) > 1:
+                    cols['descripcion'] = data_df.columns[1]
                 
-                # Calcular monto final
-                result_df['Monto'] = result_df['Cargo'] + result_df['Abono']
+                # Crear DataFrame normalizado
+                result_df = pd.DataFrame()
                 
-                # Limpiar datos
-                result_df = result_df.dropna(subset=['Fecha'])
-                result_df = result_df[result_df['Monto'] != 0]
-                
-                # Filtrar filas de totales y subtotales
-                result_df = result_df[~result_df['Descripción'].astype(str).str.contains('total|subtotal|saldo', case=False)]
-                
-                # Convertir a lista de diccionarios
-                movimientos = result_df[['Fecha', 'Descripción', 'Monto', 'Tipo']].to_dict(orient='records')
-                
-                if movimientos and len(movimientos) > 0:
-                    return saldo_disponible, movimientos
+                # Procesar fechas y descripciones
+                if cols['fecha'] and cols['descripcion']:
+                    # Verificar si las columnas existen en el DataFrame
+                    if cols['fecha'] in data_df.columns and cols['descripcion'] in data_df.columns:
+                        result_df['Fecha'] = data_df[cols['fecha']]
+                        result_df['Descripción'] = data_df[cols['descripcion']]
+                        
+                        # Procesar montos - diferentes posibles formatos
+                        result_df['Cargo'] = 0
+                        result_df['Abono'] = 0
+                        
+                        # Función para limpiar y convertir montos
+                        def parse_monto(valor):
+                            if pd.isna(valor):
+                                return 0
+                            if isinstance(valor, (int, float)):
+                                return float(valor)
+                            # Limpiar strings
+                            valor_str = str(valor).replace('$', '').replace('.', '').replace(',', '.').strip()
+                            try:
+                                return float(valor_str)
+                            except:
+                                return 0
+                        
+                        # Procesar cargos y abonos si existen
+                        if cols['cargo'] and cols['cargo'] in data_df.columns:
+                            result_df['Cargo'] = data_df[cols['cargo']].apply(parse_monto)
+                        if cols['abono'] and cols['abono'] in data_df.columns:
+                            result_df['Abono'] = data_df[cols['abono']].apply(parse_monto)
+                        
+                        # Si hay una columna de monto único
+                        if cols['monto'] and cols['monto'] in data_df.columns and not (cols['cargo'] or cols['abono']):
+                            montos = data_df[cols['monto']].apply(parse_monto)
+                            result_df['Cargo'] = montos.apply(lambda x: abs(x) if x < 0 else 0)
+                            result_df['Abono'] = montos.apply(lambda x: x if x > 0 else 0)
+                        
+                        # Determinar tipo
+                        result_df['Tipo'] = 'Gasto'
+                        # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
+                        mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
+                        result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
+                        
+                        # Calcular monto final
+                        result_df['Monto'] = result_df.apply(
+                            lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
+                            axis=1
+                        )
+                        
+                        # Limpiar datos
+                        result_df = result_df.dropna(subset=['Fecha'])
+                        result_df = result_df[result_df['Monto'] != 0]
+                        
+                        # Filtrar filas de totales y subtotales
+                        result_df = result_df[~result_df['Descripción'].astype(str).str.contains('total|subtotal|saldo', case=False)]
+                        
+                        # Convertir a lista de diccionarios
+                        movimientos = result_df[['Fecha', 'Descripción', 'Monto', 'Tipo']].to_dict(orient='records')
+                        
+                        if movimientos and len(movimientos) > 0:
+                            return saldo_disponible, movimientos
     
     except Exception as e:
         logger.warning(f"Error en formato 1: {str(e)}")
@@ -422,8 +439,8 @@ def extraer_datos_bancochile_formato2(df):
                     # Verificar patrones de fecha como DD/MM/YYYY o similares
                     if any(x in cell for x in ['/', '-', '.']) and any(char.isdigit() for char in cell):
                         try:
-                            # Intentar convertir a fecha
-                            pd.to_datetime(cell, errors='raise')
+                            # Intentar convertir a fecha con formato explícito para Chile (DD/MM/YYYY)
+                            pd.to_datetime(cell, errors='raise', dayfirst=True)
                             fecha_count += 1
                             fecha_indices.append(row_idx)
                         except:
@@ -526,13 +543,17 @@ def extraer_datos_bancochile_formato2(df):
                     else:
                         result_df['Abono'] = valores.apply(lambda x: x if x > 0 else 0)
             
-            # Determinar tipo
+            # Determinar tipo - AQUÍ ESTÁ EL PROBLEMA
             result_df['Tipo'] = 'Gasto'
-            mask_ingreso = result_df['Abono'] > 0
+            # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
+            mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
             result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
             
             # Calcular monto final
-            result_df['Monto'] = result_df['Cargo'] + result_df['Abono']
+            result_df['Monto'] = result_df.apply(
+                lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
+                axis=1
+            )
             
             # Limpiar datos
             result_df = result_df.dropna(subset=['Fecha'])
@@ -661,13 +682,17 @@ def extraer_datos_bancochile_analisis_estructural(df):
                             else:
                                 result_df['Abono'] += valores.apply(lambda x: x if x > 0 else 0)
                     
-                    # Determinar tipo
+                    # Determinar tipo - AQUÍ ESTÁ EL PROBLEMA
                     result_df['Tipo'] = 'Gasto'
-                    mask_ingreso = result_df['Abono'] > 0
+                    # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
+                    mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
                     result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
                     
                     # Calcular monto final
-                    result_df['Monto'] = result_df['Cargo'] + result_df['Abono']
+                    result_df['Monto'] = result_df.apply(
+                        lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
+                        axis=1
+                    )
                     
                     # Limpiar datos
                     result_df = result_df.dropna(subset=['Fecha'])
@@ -791,13 +816,17 @@ def extraer_datos_bancochile_sin_encabezados(df):
                             else:
                                 result_df['Abono'] += valores.apply(lambda x: x if x > 0 else 0)
                 
-                # Determinar tipo
+                # Determinar tipo - AQUÍ ESTÁ EL PROBLEMA
                 result_df['Tipo'] = 'Gasto'
-                mask_ingreso = result_df['Abono'] > 0
+                # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
+                mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
                 result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
                 
                 # Calcular monto final
-                result_df['Monto'] = result_df['Cargo'] + result_df['Abono']
+                result_df['Monto'] = result_df.apply(
+                    lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
+                    axis=1
+                )
                 
                 # Limpiar datos
                 result_df = result_df.dropna(subset=['Fecha'])
