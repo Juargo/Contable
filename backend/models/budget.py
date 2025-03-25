@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, DateTim
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from ..database import Base
+from database import Base  # Cambiar a importación absoluta
 
 class Budget(Base):
     __tablename__ = "budgets"

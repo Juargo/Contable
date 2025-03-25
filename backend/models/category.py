@@ -1,7 +1,8 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 
-from ..database import Base
+# Cambiar a importación absoluta
+from database import Base
 
 class Category(Base):
     __tablename__ = "categories"

@@ -56,7 +56,7 @@ export default function BudgetDetail({ budgetId, onBack, onRefresh }: BudgetDeta
   const fetchBudgetDetail = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/budgets/${budgetId}`);
+      const response = await fetch(`${API_URL}/budgets/${budgetId}`);
       
       if (!response.ok) {
         throw new Error('Error al cargar el detalle del presupuesto');
@@ -76,7 +76,7 @@ export default function BudgetDetail({ budgetId, onBack, onRefresh }: BudgetDeta
   
   const fetchActualData = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/budgets/${budgetId}/vs-actual`);
+      const response = await fetch(`${API_URL}/budgets/${budgetId}/vs-actual`);
       if (!response.ok) {
         throw new Error('Error al cargar datos comparativos');
       }
@@ -103,7 +103,7 @@ export default function BudgetDetail({ budgetId, onBack, onRefresh }: BudgetDeta
   
   const handleCategorySelected = async (categoryId: number, categoryName: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/budgets/${budgetId}/categories`, {
+      const response = await fetch(`${API_URL}/budgets/${budgetId}/categories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -128,7 +128,7 @@ export default function BudgetDetail({ budgetId, onBack, onRefresh }: BudgetDeta
     }
     
     try {
-      const response = await fetch(`${API_URL}/api/budgets/${budgetId}/categories/${categoryId}`, {
+      const response = await fetch(`${API_URL}/budgets/${budgetId}/categories/${categoryId}`, {
         method: 'DELETE'
       });
       
@@ -144,7 +144,7 @@ export default function BudgetDetail({ budgetId, onBack, onRefresh }: BudgetDeta
   
   const handleSetSubcategoryBudget = async (subcategoryId: number, amount: number) => {
     try {
-      const response = await fetch(`${API_URL}/api/budgets/${budgetId}/subcategories`, {
+      const response = await fetch(`${API_URL}/budgets/${budgetId}/subcategories`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

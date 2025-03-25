@@ -26,7 +26,7 @@ export default function BudgetList({ onSelectBudget, onCreateBudget }: BudgetLis
   const fetchBudgets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/budgets`);
+      const response = await fetch(`${API_URL}/budgets`);
       
       if (!response.ok) {
         throw new Error('Error al cargar la lista de presupuestos');
@@ -49,7 +49,7 @@ export default function BudgetList({ onSelectBudget, onCreateBudget }: BudgetLis
     }
     
     try {
-      const response = await fetch(`${API_URL}/api/budgets/${id}`, {
+      const response = await fetch(`${API_URL}/budgets/${id}`, {
         method: 'DELETE'
       });
       

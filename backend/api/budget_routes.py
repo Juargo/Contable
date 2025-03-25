@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models.budget import Budget, BudgetCategory, SubcategoryBudget
-from ..models.category import Category
-from ..schemas.budget_schema import (
+# Cambiar a importaciones absolutas
+from database import get_db
+from models.budget import Budget, BudgetCategory, SubcategoryBudget
+from models.category import Category
+from schemas.budget_schema import (
     BudgetCreate, BudgetResponse, BudgetUpdate, BudgetDetailResponse,
     BudgetCategoryCreate, BudgetCategoryResponse,
     SubcategoryBudgetCreate, SubcategoryBudgetResponse, BudgetVsActualResponse

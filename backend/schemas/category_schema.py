@@ -23,7 +23,7 @@ class CategoryResponse(CategoryBase):
     parent_id: Optional[int] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True  # Cambiado de 'orm_mode' a 'from_attributes'
 
 class CategoryWithSubcategoriesResponse(CategoryResponse):
     subcategories: List[CategoryResponse] = []

@@ -30,7 +30,7 @@ export default function CategorySelector({
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/categories?parent_only=true`);
+      const response = await fetch(`${API_URL}/categories?parent_only=true`);  // Cambiar "/api/categories" a solo "/categories"
       
       if (!response.ok) {
         throw new Error('Error al cargar las categorías');

@@ -1,1 +1,1 @@
-# Archivo de inicialización del paquete schemas
+# Este archivo vacío marca la carpeta schemas como un paquete Python

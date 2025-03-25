@@ -30,7 +30,7 @@ class BudgetResponse(BudgetBase):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True  # Cambiado de 'orm_mode' a 'from_attributes'
 
 # Schemas for BudgetCategory
 class BudgetCategoryBase(BaseModel):
@@ -46,7 +46,7 @@ class BudgetCategoryResponse(BudgetCategoryBase):
     created_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True  # Cambiado de 'orm_mode' a 'from_attributes'
 
 # Schemas for SubcategoryBudget
 class SubcategoryBudgetBase(BaseModel):
@@ -67,7 +67,7 @@ class SubcategoryBudgetResponse(BaseModel):
     updated_at: datetime
     
     class Config:
-        orm_mode = True
+        from_attributes = True  # Cambiado de 'orm_mode' a 'from_attributes'
 
 # Schema for Subcategory with Budget Amount
 class SubcategoryWithBudget(BaseModel):
@@ -96,4 +96,4 @@ class BudgetVsActualResponse(BaseModel):
     difference: float
     
     class Config:
-        orm_mode = True
+        from_attributes = True  # Cambiado de 'orm_mode' a 'from_attributes'

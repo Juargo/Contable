@@ -3,11 +3,12 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
-from ..database import get_db
-from ..models.category import Category
-from ..models.transaction import Transaction
-from ..models.budget import BudgetCategory, SubcategoryBudget
-from ..schemas.category_schema import (
+# Cambiar a importaciones absolutas
+from database import get_db
+from models.category import Category
+from models.transaction import Transaction
+from models.budget import BudgetCategory, SubcategoryBudget
+from schemas.category_schema import (
     CategoryCreate, CategoryResponse, CategoryUpdate, 
     CategoryWithSubcategoriesResponse, SubcategoryCreate
 )

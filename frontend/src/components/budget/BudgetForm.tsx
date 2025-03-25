@@ -45,7 +45,7 @@ export default function BudgetForm({ budgetId, onSave, onCancel }: BudgetFormPro
   const loadBudget = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/budgets/${budgetId}`);
+      const response = await fetch(`${API_URL}/budgets/${budgetId}`);  // Cambiar "/api/budgets/" a solo "/budgets/"
       
       if (!response.ok) {
         throw new Error('Error al cargar los datos del presupuesto');
@@ -97,8 +97,8 @@ export default function BudgetForm({ budgetId, onSave, onCancel }: BudgetFormPro
       setSaving(true);
       
       const url = budgetId 
-        ? `${API_URL}/api/budgets/${budgetId}`
-        : `${API_URL}/api/budgets`;
+        ? `${API_URL}/budgets/${budgetId}`  // Cambiar "/api/budgets/" a solo "/budgets/"
+        : `${API_URL}/budgets`;            // Cambiar "/api/budgets" a solo "/budgets"
       
       const method = budgetId ? 'PUT' : 'POST';
       
