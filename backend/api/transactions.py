@@ -363,87 +363,140 @@ def extraer_datos_santander(archivo):
         # Cargar el archivo Excel
         xls = pd.ExcelFile(archivo)
         sheet_name = xls.sheet_names[0]
-        df = pd.read_excel(xls, sheet_name=sheet_name)  # Corregido de readexcel a read_excel
-
-        # Buscar la primera fila con información de saldo
+        df = pd.read_excel(xls, sheet_name=sheet_name)
+        
+        logger.info(f"Procesando archivo Santander con forma: {df.shape}")
+        
+        # Inicializar variables
         saldo_disponible = None
-        for i, row in df.iterrows():
-            if "Saldo" in str(row.to_string()):
-                # Intentar encontrar la columna de saldo
-                for j, col_name in enumerate(df.columns):
-                    if "Saldo" in str(col_name):
-                        saldo_disponible = df.iloc[i, j]
-                        break
-                if saldo_disponible is not None:
-                    break
-
-        # Buscar las columnas con información de movimientos
         df_movimientos = None
-        for i, row in df.iterrows():
-            row_str = str(row.to_string()).lower()
-            if any(
-                col.lower() in row_str
-                for col in ["Fecha", "Detalle", "Monto", "Cargo", "Abono"]
-            ):
-                df_movimientos = df.iloc[i + 1:].copy()
-                df_movimientos.columns = df.iloc[i]
-                break
-
-        if df_movimientos is not None:
-            # Mapear nombres de columnas que podrían variar
-            column_mapping = {
-                "Fecha": ["Fecha", "FECHA", "Fecha Transacción"],
-                "Detalle": ["Detalle", "DETALLE", "Descripción", "Glosa"],
-                "Cargo": ["Cargo", "CARGO", "Monto Cargo", "Débitos", "Débito"],
-                "Abono": ["Abono", "ABONO", "Monto Abono", "Créditos", "Crédito"]
-            }
-
-            # Crear diccionario para almacenar las columnas encontradas
-            found_columns = {}
+        
+        # Intento 1: Buscar la tabla de movimientos por encabezados
+        for i in range(len(df) - 5):  # Revisar todas las filas, dejando margen para datos
+            current_row = df.iloc[i:i+1]
+            row_text = " ".join([str(x).lower() for x in current_row.values.flatten() if pd.notna(x)])
             
-            for target_col, possible_names in column_mapping.items():
-                for col_name in df_movimientos.columns:
-                    if any(possible in str(col_name) for possible in possible_names):
-                        found_columns[target_col] = col_name
-                        break
-            
-            # Verificar que tengamos las columnas mínimas necesarias
-            if "Fecha" in found_columns and "Detalle" in found_columns and ("Cargo" in found_columns or "Abono" in found_columns):
-                # Crear DataFrame con columnas estándar
-                df_final = pd.DataFrame()
-                df_final["Fecha"] = df_movimientos[found_columns["Fecha"]]
-                df_final["Descripción"] = df_movimientos[found_columns["Detalle"]]
+            # Buscar patrones comunes en encabezados de movimientos Santander
+            if any(x in row_text for x in ["fecha", "descripción", "cargo", "abono", "detalle"]):
+                logger.info(f"Encontrados posibles encabezados en fila {i}: {row_text}")
                 
-                # Inicializar columnas de cargo y abono
+                # Intentar extraer la tabla usando esta fila como encabezado
+                try:
+                    headers = [str(col).strip() for col in df.iloc[i]]
+                    df_movimientos = pd.DataFrame(df.iloc[i+1:].values, columns=headers)
+                    
+                    # Verificar si tenemos datos válidos
+                    if len(df_movimientos) > 0:
+                        logger.info(f"Tabla de movimientos extraída con {len(df_movimientos)} filas")
+                        break
+                except Exception as e:
+                    logger.warning(f"Error al extraer tabla en fila {i}: {str(e)}")
+        
+        # Si no se encontró la tabla, buscar por análisis de estructura
+        if df_movimientos is None:
+            logger.info("Buscando tabla por análisis de estructura...")
+            
+            # Buscar bloques de texto que contengan columnas numéricas (posibles montos)
+            for i in range(len(df) - 10):
+                numeric_cols = df.iloc[i:i+10].select_dtypes(include=['number']).columns
+                if len(numeric_cols) >= 2:  # Al menos dos columnas numéricas (cargo y abono)
+                    # Verificar si hay texto que parece encabezados en esta área
+                    text_cols = [col for col in df.columns if col not in numeric_cols]
+                    if len(text_cols) >= 1:  # Al menos una columna de texto (descripción)
+                        logger.info(f"Posible tabla encontrada en fila {i}")
+                        
+                        # Crear nombres de columna si no son claros
+                        headers = []
+                        for j, col in enumerate(df.columns):
+                            if j in numeric_cols:
+                                if "cargo" not in headers and "abono" not in headers:
+                                    headers.append("Cargo" if j % 2 == 0 else "Abono")
+                                else:
+                                    headers.append("Monto" + str(j))
+                            else:
+                                if "fecha" not in headers:
+                                    headers.append("Fecha")
+                                elif "descrip" not in headers and "detalle" not in headers:
+                                    headers.append("Descripción")
+                                else:
+                                    headers.append("Texto" + str(j))
+                        
+                        # Crear DataFrame con datos desde esta fila
+                        df_movimientos = pd.DataFrame(df.iloc[i:].values, columns=headers)
+                        break
+        
+        # Procesar el DataFrame de movimientos si se encontró
+        if df_movimientos is not None:
+            # Eliminar filas sin fechas o con datos incompletos
+            df_movimientos = df_movimientos.dropna(thresh=3)  # Al menos 3 columnas con datos
+            
+            # Buscar columnas clave
+            col_fecha = next((col for col in df_movimientos.columns if "fecha" in str(col).lower()), None)
+            col_descripcion = next((col for col in df_movimientos.columns 
+                                   if any(x in str(col).lower() for x in ["descrip", "detalle", "glosa", "concepto"])), None)
+            col_cargo = next((col for col in df_movimientos.columns 
+                             if any(x in str(col).lower() for x in ["cargo", "débito", "debito"])), None)
+            col_abono = next((col for col in df_movimientos.columns 
+                             if any(x in str(col).lower() for x in ["abono", "crédito", "credito"])), None)
+            
+            logger.info(f"Columnas identificadas: Fecha={col_fecha}, Desc={col_descripcion}, Cargo={col_cargo}, Abono={col_abono}")
+            
+            # Verificar que tenemos las columnas mínimas necesarias
+            if col_fecha is not None and col_descripcion is not None and (col_cargo is not None or col_abono is not None):
+                # Crear DataFrame final con columnas estandarizadas
+                df_final = pd.DataFrame()
+                df_final["Fecha"] = df_movimientos[col_fecha]
+                df_final["Descripción"] = df_movimientos[col_descripcion]
+                
+                # Inicializar columnas numéricas
                 df_final["Cargo"] = 0
                 df_final["Abono"] = 0
                 
-                # Llenar columnas de cargo y abono si existen
-                if "Cargo" in found_columns:
-                    df_final["Cargo"] = pd.to_numeric(df_movimientos[found_columns["Cargo"]], errors="coerce").fillna(0)
+                # Función para convertir valores a números
+                def parse_monto(valor):
+                    if pd.isna(valor):
+                        return 0
+                    if isinstance(valor, (int, float)):
+                        return valor
+                    try:
+                        # Limpiar el valor (quitar símbolos, separadores, etc.)
+                        valor_str = str(valor).replace('$', '').replace('.', '').replace(',', '.').strip()
+                        return float(valor_str)
+                    except:
+                        return 0
                 
-                if "Abono" in found_columns:
-                    df_final["Abono"] = pd.to_numeric(df_movimientos[found_columns["Abono"]], errors="coerce").fillna(0)
+                # Procesar columnas de cargo y abono
+                if col_cargo is not None:
+                    df_final["Cargo"] = df_movimientos[col_cargo].apply(parse_monto)
+                if col_abono is not None:
+                    df_final["Abono"] = df_movimientos[col_abono].apply(parse_monto)
                 
-                # Determinar tipo y monto final
+                # Determinar tipo de transacción
                 df_final["Tipo"] = "Gasto"
-                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"  # Corregido aquí: cambiado '(' por '['
+                df_final.loc[df_final["Abono"] > 0, "Tipo"] = "Ingreso"
+                
+                # Calcular monto total (positivo para ambos tipos)
                 df_final["Monto"] = df_final["Cargo"] + df_final["Abono"]
                 
-                # Filtrar filas con valores nulos en fecha o monto
-                df_final = df_final.dropna(subset=["Fecha", "Monto"])
+                # Limpiar datos - eliminar filas sin montos o con fechas inválidas
+                df_final = df_final[df_final["Monto"] > 0]  # Solo montos positivos > 0
+                df_final = df_final[~df_final["Fecha"].astype(str).str.contains("Total|TOTAL|Subtotal", case=False)]
                 
-                # Filtrar transacciones con monto != 0
-                df_final = df_final[df_final["Monto"] != 0]
-                
-                # Convertir a lista de diccionarios
+                # Formatear datos para el resultado final
                 movimientos_santander = df_final[["Fecha", "Descripción", "Monto", "Tipo"]].to_dict(orient="records")
-                return saldo_disponible, movimientos_santander
+                
+                logger.info(f"Extraídos {len(movimientos_santander)} movimientos de Santander")
+                if movimientos_santander:
+                    logger.debug(f"Primer movimiento: {movimientos_santander[0]}")
+                
+                return saldo_disponible or 0, movimientos_santander
             else:
-                return saldo_disponible, []
+                logger.warning("No se encontraron columnas necesarias en los datos")
+                return 0, []
         else:
-            return saldo_disponible, []
-
+            logger.warning("No se pudo identificar la tabla de movimientos")
+            return 0, []
+    
     except Exception as e:
         logger.error(f"Error al procesar archivo de Banco Santander: {str(e)}", exc_info=True)
         return 0, []

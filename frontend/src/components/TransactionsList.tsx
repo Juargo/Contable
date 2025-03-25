@@ -242,16 +242,22 @@ export default function TransactionsList() {
                       <th>Descripción</th>
                       <th>Cantidad</th>
                       <th>Monto Total</th>
+                      <th>Tipo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {groupedTransactions.map((group, index) => (
-                      <tr key={index}>
-                        <td>{group.description}</td>
-                        <td className="count">{group.count}</td>
-                        <td className="amount">{formatAmount(group.total_amount)}</td>
-                      </tr>
-                    ))}
+                    {groupedTransactions.map((group, index) => {
+                      // Determinar el tipo basado en el monto total
+                      const tipo = group.total_amount >= 0 ? "Ingreso" : "Gasto";
+                      return (
+                        <tr key={index} className={tipo.toLowerCase()}>
+                          <td>{group.description}</td>
+                          <td className="count">{group.count}</td>
+                          <td className="amount">{formatAmount(group.total_amount)}</td>
+                          <td className={`tipo ${tipo.toLowerCase()}`}>{tipo}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
