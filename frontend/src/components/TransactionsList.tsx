@@ -11,10 +11,21 @@ interface Transaction {
   tipo: string; // Campo nuevo para el tipo (Ingreso/Gasto)
 }
 
+interface TransactionDetail {
+  id: number;
+  transaction_date: string;
+  description: string;
+  amount: number;
+  category: string;
+}
+
 interface TransactionGroup {
   description: string;
   total_amount: number;
   count: number;
+  bank_id: number | null;
+  bank_name: string | null;
+  transactions: TransactionDetail[];
 }
 
 interface Bank {
@@ -33,6 +44,7 @@ export default function TransactionsList() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [banks, setBanks] = useState<Bank[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTransactionsByMonth();
@@ -120,6 +132,17 @@ export default function TransactionsList() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0 
     });
+  };
+
+  // Manejar la expansión/contracción de grupos
+  const toggleGroupExpansion = (groupKey: string) => {
+    const newExpandedGroups = new Set(expandedGroups);
+    if (newExpandedGroups.has(groupKey)) {
+      newExpandedGroups.delete(groupKey);
+    } else {
+      newExpandedGroups.add(groupKey);
+    }
+    setExpandedGroups(newExpandedGroups);
   };
 
   // Generar opciones para el selector de meses
@@ -236,30 +259,65 @@ export default function TransactionsList() {
                   </tbody>
                 </table>
               ) : (
-                <table className="grouped-table">
-                  <thead>
-                    <tr>
-                      <th>Descripción</th>
-                      <th>Cantidad</th>
-                      <th>Monto Total</th>
-                      <th>Tipo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupedTransactions.map((group, index) => {
-                      // Determinar el tipo basado en el monto total
-                      const tipo = group.total_amount >= 0 ? "Ingreso" : "Gasto";
-                      return (
-                        <tr key={index} className={tipo.toLowerCase()}>
-                          <td>{group.description}</td>
-                          <td className="count">{group.count}</td>
-                          <td className="amount">{formatAmount(group.total_amount)}</td>
-                          <td className={`tipo ${tipo.toLowerCase()}`}>{tipo}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="accordion-container">
+                  {groupedTransactions.map((group, index) => {
+                    // Determinar el tipo basado en el monto total
+                    const tipo = group.total_amount >= 0 ? "Ingreso" : "Gasto";
+                    
+                    // Crear un identificador único para este grupo
+                    const groupKey = `group-${index}-${group.description}`;
+                    
+                    // Verificar si el grupo está expandido
+                    const isExpanded = expandedGroups.has(groupKey);
+                    
+                    return (
+                      <div key={groupKey} className={`accordion-item ${tipo.toLowerCase()}`}>
+                        <div 
+                          className="accordion-header" 
+                          onClick={() => toggleGroupExpansion(groupKey)}
+                        >
+                          <div className="accordion-title">
+                            <span className="group-description">{group.description}</span>
+                            <span className="group-bank">
+                              {group.bank_name || getBankName(group.bank_id)}
+                            </span>
+                          </div>
+                          <div className="accordion-summary">
+                            <span className="group-count">{group.count} transacción{group.count !== 1 ? 'es' : ''}</span>
+                            <span className="group-amount">{formatAmount(group.total_amount)}</span>
+                            <span className={`group-tipo ${tipo.toLowerCase()}`}>{tipo}</span>
+                            <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>
+                              &#9660;
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="accordion-content">
+                            <table className="details-table">
+                              <thead>
+                                <tr>
+                                  <th>Fecha</th>
+                                  <th>Categoría</th>
+                                  <th>Monto</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.transactions.map(transaction => (
+                                  <tr key={transaction.id}>
+                                    <td>{formatDate(transaction.transaction_date)}</td>
+                                    <td>{transaction.category || 'Sin categoría'}</td>
+                                    <td className="amount">{formatAmount(transaction.amount)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -366,7 +424,7 @@ export default function TransactionsList() {
         }
         
         .transactions-table,
-        .grouped-table {
+        .details-table {
           width: 100%;
           border-collapse: collapse;
           font-size: 0.9rem;
@@ -412,16 +470,16 @@ export default function TransactionsList() {
           background-color: rgba(244, 67, 54, 0.1);
         }
         
-        .tipo {
+        .tipo, .group-tipo {
           font-weight: 600;
           text-align: center;
         }
         
-        .tipo.ingreso {
+        .tipo.ingreso, .group-tipo.ingreso {
           color: #4caf50;
         }
         
-        .tipo.gasto {
+        .tipo.gasto, .group-tipo.gasto {
           color: #f44336;
         }
         
@@ -441,6 +499,102 @@ export default function TransactionsList() {
         .no-data {
           color: #555;
           font-style: italic;
+        }
+        
+        /* Estilos para el acordeón */
+        .accordion-container {
+          display: flex;
+          flex-direction: column;
+          gap: 0.8rem;
+          width: 100%;
+        }
+        
+        .accordion-item {
+          border: 1px solid #eee;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+          transition: all 0.3s ease;
+        }
+        
+        .accordion-item.ingreso {
+          border-left: 4px solid #4caf50;
+        }
+        
+        .accordion-item.gasto {
+          border-left: 4px solid #f44336;
+        }
+        
+        .accordion-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem;
+          background-color: #fff;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        
+        .accordion-header:hover {
+          background-color: #f9f9f9;
+        }
+        
+        .accordion-title {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .group-description {
+          font-weight: 600;
+          font-size: 1rem;
+        }
+        
+        .group-bank {
+          font-size: 0.8rem;
+          color: #757575;
+          margin-top: 0.3rem;
+        }
+        
+        .accordion-summary {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+        
+        .group-count {
+          font-size: 0.85rem;
+          color: #757575;
+          white-space: nowrap;
+        }
+        
+        .group-amount {
+          font-weight: 700;
+          font-size: 1rem;
+        }
+        
+        .expand-icon {
+          font-size: 0.8rem;
+          transition: transform 0.3s ease;
+          margin-left: 0.5rem;
+        }
+        
+        .expand-icon.expanded {
+          transform: rotate(180deg);
+        }
+        
+        .accordion-content {
+          padding: 0.5rem 1rem;
+          border-top: 1px solid #eee;
+          background-color: #fafafa;
+        }
+        
+        .details-table {
+          margin: 0.5rem 0;
+        }
+        
+        .details-table th, .details-table td {
+          padding: 0.6rem;
+          font-size: 0.85rem;
         }
       `}</style>
     </div>

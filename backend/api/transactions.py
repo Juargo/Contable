@@ -794,12 +794,21 @@ async def get_transactions_by_month(
             detail=f"Error al obtener transacciones: {str(e)}"
         )
 
-# Agregar este nuevo modelo para la respuesta agrupada
+# Actualizar el modelo para la respuesta agrupada
+class TransactionDetail(BaseModel):
+    id: int
+    transaction_date: date
+    description: str
+    amount: int
+    category: Optional[str] = None
+
 class TransactionGroup(BaseModel):
     description: str
     total_amount: int
     count: int
     bank_id: Optional[int] = None
+    bank_name: Optional[str] = None
+    transactions: List[TransactionDetail] = []
 
 @router.get("/transactions-grouped-by-month", response_model=List[TransactionGroup])
 async def get_transactions_grouped_by_month(
@@ -814,7 +823,7 @@ async def get_transactions_grouped_by_month(
     
     Returns:
         Lista de transacciones agrupadas por descripción con el total y conteo de cada grupo.
-        Incluye el ID del banco asociado a cada grupo de transacciones.
+        Incluye el ID del banco, nombre del banco y el detalle de las transacciones en cada grupo.
     """
     try:
         # Calcular el último día del mes
@@ -824,32 +833,48 @@ async def get_transactions_grouped_by_month(
         start_date = date(year, month, 1)
         end_date = date(year, month, last_day)
         
-        # Filtrar transacciones por el rango de fechas
+        # Obtener todas las transacciones del mes para procesamiento posterior
         transactions = await Transaction.filter(
             transaction_date__gte=start_date,
             transaction_date__lte=end_date
-        ).values('description', 'amount', 'bank_id')
+        ).prefetch_related('bank')
         
         # Agrupar por descripción y banco
         grouped_data = {}
         for trans in transactions:
-            description = trans['description']
-            amount = trans['amount']
-            bank_id = trans['bank_id']
+            description = trans.description
+            bank_id = trans.bank_id
             
-            # Crear clave compuesta con descripción y banco
+            # Usar solo la descripción como clave para agrupar
             group_key = f"{description}_{bank_id}"
             
             if group_key not in grouped_data:
+                # Obtener el nombre del banco si existe
+                bank_name = None
+                if hasattr(trans, 'bank') and trans.bank:
+                    bank_name = trans.bank.name
+                
                 grouped_data[group_key] = {
                     'description': description,
                     'bank_id': bank_id,
+                    'bank_name': bank_name,
                     'total_amount': 0,
-                    'count': 0
+                    'count': 0,
+                    'transactions': []
                 }
             
-            grouped_data[group_key]['total_amount'] += amount
+            # Acumular montos y contar
+            grouped_data[group_key]['total_amount'] += trans.amount
             grouped_data[group_key]['count'] += 1
+            
+            # Agregar detalles de la transacción
+            grouped_data[group_key]['transactions'].append({
+                'id': trans.id,
+                'transaction_date': trans.transaction_date,
+                'description': trans.description,
+                'amount': int(trans.amount),  # Eliminar decimales
+                'category': trans.category
+            })
         
         # Formatear los resultados como una lista de objetos
         result = [
@@ -857,7 +882,11 @@ async def get_transactions_grouped_by_month(
                 'description': data['description'],
                 'total_amount': int(data['total_amount']),  # Eliminar decimales
                 'count': data['count'],
-                'bank_id': data['bank_id']
+                'bank_id': data['bank_id'],
+                'bank_name': data['bank_name'],
+                'transactions': sorted(data['transactions'], 
+                                       key=lambda x: x['transaction_date'], 
+                                       reverse=True)  # Ordenar por fecha descendente
             }
             for group_key, data in grouped_data.items()
         ]
