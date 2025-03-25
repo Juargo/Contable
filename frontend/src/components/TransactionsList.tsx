@@ -165,8 +165,14 @@ export default function TransactionsList() {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  // Calcular el total gastado
-  const totalAmount = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  // Calcular el total gastado - modificado para distinguir entre ingresos y gastos
+  const totalGastos = transactions
+    .filter(transaction => transaction.tipo === 'Gasto')
+    .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0);
+  
+  const totalIngresos = transactions
+    .filter(transaction => transaction.tipo === 'Ingreso')
+    .reduce((sum, transaction) => sum + transaction.amount, 0);
 
   if (loading) return <div className="loading">Cargando transacciones...</div>;
   if (error) return <div className="error">Error: {error}</div>;
@@ -207,12 +213,22 @@ export default function TransactionsList() {
         <>
           <div className="summary-card">
             <div className="summary-item">
-              <span className="summary-label">Total de transacciones:</span>
+              <span className="summary-label">Total transacciones:</span>
               <span className="summary-value">{transactions.length}</span>
             </div>
             <div className="summary-item">
-              <span className="summary-label">Total gastado:</span>
-              <span className="summary-value">{formatAmount(totalAmount)}</span>
+              <span className="summary-label">Total gastos:</span>
+              <span className="summary-value negative">{formatAmount(totalGastos)}</span>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Total ingresos:</span>
+              <span className="summary-value positive">{formatAmount(totalIngresos)}</span>
+            </div>
+            <div className="summary-item">
+              <span className="summary-label">Balance:</span>
+              <span className={`summary-value ${totalIngresos - totalGastos >= 0 ? 'positive' : 'negative'}`}>
+                {formatAmount(totalIngresos - totalGastos)}
+              </span>
             </div>
           </div>
           
@@ -595,6 +611,14 @@ export default function TransactionsList() {
         .details-table th, .details-table td {
           padding: 0.6rem;
           font-size: 0.85rem;
+        }
+
+        .summary-value.positive {
+          color: #4caf50;
+        }
+        
+        .summary-value.negative {
+          color: #f44336;
         }
       `}</style>
     </div>

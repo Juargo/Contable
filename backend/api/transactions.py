@@ -387,13 +387,19 @@ def extraer_datos_bancochile_formato1(df):
                             result_df['Cargo'] = montos.apply(lambda x: abs(x) if x < 0 else 0)
                             result_df['Abono'] = montos.apply(lambda x: x if x > 0 else 0)
                         
-                        # Determinar tipo
-                        result_df['Tipo'] = 'Gasto'
-                        # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
-                        mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
-                        result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
+                        # Determinar tipo - Corregir la lógica
+                        # Siempre asignar según valores en Cargo y Abono
+                        result_df['Tipo'] = 'Gasto'  # Valor predeterminado
                         
-                        # Calcular monto final
+                        # Es un gasto si hay valor en Cargo
+                        gastos_mask = result_df['Cargo'] > 0
+                        result_df.loc[gastos_mask, 'Tipo'] = 'Gasto'
+                        
+                        # Es un ingreso si hay valor en Abono y no hay valor en Cargo
+                        ingresos_mask = (result_df['Abono'] > 0) & (~gastos_mask)
+                        result_df.loc[ingresos_mask, 'Tipo'] = 'Ingreso'
+                        
+                        # Calcular monto final basado en el tipo
                         result_df['Monto'] = result_df.apply(
                             lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
                             axis=1
@@ -534,22 +540,35 @@ def extraer_datos_bancochile_formato2(df):
                 result_df['Abono'] = montos.apply(lambda x: x if x > 0 else 0)
             elif len(cols_numericas) >= 2:
                 # Probablemente columnas separadas para cargo y abono
-                # Determinar cuál es cuál basado en valores negativos/positivos
+                cargo_encontrado = False
+                abono_encontrado = False
+                
                 for col in cols_numericas:
                     valores = pd.to_numeric(data_df[col], errors='coerce').fillna(0)
                     # Si la mayoría son negativos, probablemente es cargo
-                    if (valores < 0).sum() > (valores > 0).sum():
+                    neg_count = (valores < 0).sum()
+                    pos_count = (valores > 0).sum()
+                    
+                    if neg_count > pos_count and not cargo_encontrado:
                         result_df['Cargo'] = valores.apply(lambda x: abs(x) if x < 0 else 0)
-                    else:
+                        cargo_encontrado = True
+                    elif pos_count > neg_count and not abono_encontrado:
                         result_df['Abono'] = valores.apply(lambda x: x if x > 0 else 0)
+                        abono_encontrado = True
             
-            # Determinar tipo - AQUÍ ESTÁ EL PROBLEMA
-            result_df['Tipo'] = 'Gasto'
-            # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
-            mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
-            result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
+            # Determinar tipo - Corregir la lógica
+            # Siempre asignar según valores en Cargo y Abono
+            result_df['Tipo'] = 'Gasto'  # Valor predeterminado
             
-            # Calcular monto final
+            # Es un gasto si hay valor en Cargo
+            gastos_mask = result_df['Cargo'] > 0
+            result_df.loc[gastos_mask, 'Tipo'] = 'Gasto'
+            
+            # Es un ingreso si hay valor en Abono y no hay valor en Cargo
+            ingresos_mask = (result_df['Abono'] > 0) & (~gastos_mask)
+            result_df.loc[ingresos_mask, 'Tipo'] = 'Ingreso'
+            
+            # Calcular monto final basado en el tipo
             result_df['Monto'] = result_df.apply(
                 lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
                 axis=1
@@ -682,13 +701,19 @@ def extraer_datos_bancochile_analisis_estructural(df):
                             else:
                                 result_df['Abono'] += valores.apply(lambda x: x if x > 0 else 0)
                     
-                    # Determinar tipo - AQUÍ ESTÁ EL PROBLEMA
-                    result_df['Tipo'] = 'Gasto'
-                    # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
-                    mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
-                    result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
+                    # Determinar tipo - Corregir la lógica
+                    # Siempre asignar según valores en Cargo y Abono
+                    result_df['Tipo'] = 'Gasto'  # Valor predeterminado
                     
-                    # Calcular monto final
+                    # Es un gasto si hay valor en Cargo
+                    gastos_mask = result_df['Cargo'] > 0
+                    result_df.loc[gastos_mask, 'Tipo'] = 'Gasto'
+                    
+                    # Es un ingreso si hay valor en Abono y no hay valor en Cargo
+                    ingresos_mask = (result_df['Abono'] > 0) & (~gastos_mask)
+                    result_df.loc[ingresos_mask, 'Tipo'] = 'Ingreso'
+                    
+                    # Calcular monto final basado en el tipo
                     result_df['Monto'] = result_df.apply(
                         lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
                         axis=1
@@ -816,13 +841,19 @@ def extraer_datos_bancochile_sin_encabezados(df):
                             else:
                                 result_df['Abono'] += valores.apply(lambda x: x if x > 0 else 0)
                 
-                # Determinar tipo - AQUÍ ESTÁ EL PROBLEMA
-                result_df['Tipo'] = 'Gasto'
-                # Marcar como "Ingreso" solo cuando hay un abono y NO hay un cargo
-                mask_ingreso = (result_df['Abono'] > 0) & (result_df['Cargo'] == 0)
-                result_df.loc[mask_ingreso, 'Tipo'] = 'Ingreso'
+                # Determinar tipo - Corregir la lógica
+                # Siempre asignar según valores en Cargo y Abono
+                result_df['Tipo'] = 'Gasto'  # Valor predeterminado
                 
-                # Calcular monto final
+                # Es un gasto si hay valor en Cargo
+                gastos_mask = result_df['Cargo'] > 0
+                result_df.loc[gastos_mask, 'Tipo'] = 'Gasto'
+                
+                # Es un ingreso si hay valor en Abono y no hay valor en Cargo
+                ingresos_mask = (result_df['Abono'] > 0) & (~gastos_mask)
+                result_df.loc[ingresos_mask, 'Tipo'] = 'Ingreso'
+                
+                # Calcular monto final basado en el tipo
                 result_df['Monto'] = result_df.apply(
                     lambda row: row['Abono'] if row['Tipo'] == 'Ingreso' else row['Cargo'], 
                     axis=1
