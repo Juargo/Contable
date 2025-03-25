@@ -13,7 +13,6 @@ from schemas.budget_schema import (
 )
 
 router = APIRouter(
-    prefix="/api/budgets",
     tags=["budgets"]
 )
 
@@ -31,7 +30,7 @@ def create_budget(budget: BudgetCreate, db: Session = Depends(get_db)):
     db.refresh(db_budget)
     return db_budget
 
-@router.get("/", response_model=List[BudgetResponse])
+@router.get("/budgets", response_model=List[BudgetResponse])
 def get_budgets(
     skip: int = 0, 
     limit: int = 100, 
