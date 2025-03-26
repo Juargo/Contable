@@ -1,29 +1,62 @@
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
 
-# Base Schema for Category
+# Esquemas para Categorías
 class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
-    color: Optional[str] = None  # Para representación visual
+    type: str  # 'Ingreso' o 'Gasto'
 
 class CategoryCreate(CategoryBase):
-    pass
-
-class SubcategoryCreate(CategoryBase):
     pass
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
+    type: Optional[str] = None
 
 class CategoryResponse(CategoryBase):
     id: int
-    parent_id: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
     
     class Config:
-        from_attributes = True  # Cambiado de 'orm_mode' a 'from_attributes'
+        from_attributes = True
 
-class CategoryWithSubcategoriesResponse(CategoryResponse):
-    subcategories: List[CategoryResponse] = []
+# Esquemas para Subcategorías
+class SubcategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class SubcategoryCreate(SubcategoryBase):
+    pass
+
+class SubcategoryUpdate(SubcategoryBase):
+    pass
+
+class SubcategoryResponse(SubcategoryBase):
+    id: int
+    parent_id: int
+    parent_name: str
+    type: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+# Esquemas para Palabras Clave de Categorías
+class CategoryKeywordBase(BaseModel):
+    keyword: str
+
+class CategoryKeywordCreate(CategoryKeywordBase):
+    pass
+
+class CategoryKeywordResponse(CategoryKeywordBase):
+    id: int
+    category_id: int
+    category_name: str
+    
+    class Config:
+        from_attributes = True
