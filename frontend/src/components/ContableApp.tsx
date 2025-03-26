@@ -9,12 +9,16 @@ interface Transaction {
   Fecha?: string;
   Descripción?: string;
   Cargo?: number;
+  Abono?: number;
+  Monto?: number;
+  Tipo?: string;
   "N° Operación"?: string;
 }
 
 interface Bank {
   id: number;
   name: string;
+  description: string;
   code?: string;
 }
 
@@ -37,10 +41,13 @@ export default function ContableApp() {
   const [selectedBankId, setSelectedBankId] = useState<number | null>(null);
   const [savingTransactions, setSavingTransactions] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [showTable, setShowTable] = useState(false); // Nuevo estado para controlar la visibilidad de la tabla
 
   useEffect(() => {
-    fetchTransactions();
+    // No cargar transacciones al iniciar, solo bancos
+    // fetchTransactions();
     fetchBanks();
+    setLoading(false); // Indicar que la carga inicial ha terminado
   }, []);
 
   const fetchTransactions = async () => {
@@ -52,6 +59,9 @@ export default function ContableApp() {
       }
       const data = await response.json();
       setData(data);
+      
+      // Solo mostrar la tabla si hay datos
+      setShowTable(data.length > 0);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -94,7 +104,6 @@ export default function ContableApp() {
     }
 
     setUploadStatus('Subiendo reporte...');
-    
     const formData = new FormData();
     formData.append('file', file);
     formData.append('bank_id', selectedBank);
@@ -119,6 +128,9 @@ export default function ContableApp() {
       setSelectedBankId(result.bank_id);
       setFile(null);
       
+      // Mostrar tabla cuando hay datos del reporte
+      setShowTable(result.transactions.length > 0);
+
       // Resetear el formulario
       const form = document.getElementById('upload-form') as HTMLFormElement;
       if (form) form.reset();
@@ -139,25 +151,44 @@ export default function ContableApp() {
     try {
       // Convertir el formato de las transacciones para el endpoint bulk-transactions
       const transactionsToSave = data.map(item => {
-        // Extraer el monto asegurando que sea número y siempre positivo
-        let monto = item.Cargo || item.amount;
-        // Asegurarse de que sea un número
-        if (typeof monto === 'string') {
-          // Eliminar cualquier formato de moneda y convertir a número
-          monto = parseFloat(monto.replace(/[^\d,-]/g, '').replace(',', '.'));
+        // Determinar el tipo (Ingreso/Gasto) de la transacción
+        const tipo = item.Tipo || 'Gasto'; // Por defecto es gasto si no se especifica
+        
+        // Obtener el monto de la transacción
+        let monto;
+        if (item.Monto !== undefined) {
+          monto = item.Monto;
+        } else if (item.amount !== undefined) {
+          monto = item.amount;
+        } else if (tipo === 'Ingreso') {
+          monto = item.Abono || 0;
+        } else {
+          monto = item.Cargo || 0;
         }
         
-        // Asegurar que el monto sea positivo usando Math.abs()
-        const montoPositivo = Math.abs(monto || 0);
+        // Ajustar el signo del monto según el tipo
+        // Para gastos: valores negativos, para ingresos: valores positivos
+        const montoAjustado = tipo === 'Gasto' 
+          ? -Math.abs(Number(monto)) 
+          : Math.abs(Number(monto));
+        
+        console.log(`Procesando transacción: ${item.Descripción || item.description}, Tipo: ${tipo}, Monto: ${montoAjustado}`);
         
         return {
           fecha: item.Fecha || item.date,
           descripcion: item.Descripción || item.description,
-          monto: montoPositivo,
+          monto: montoAjustado,
           categoria: "Sin clasificar",
-          banco_id: selectedBankId
+          banco_id: banks.find(b => b.name === selectedBank)?.id,
+          tipo: tipo
         };
       });
+
+      // Verificar que hay transacciones para guardar
+      if (transactionsToSave.length === 0) {
+        setSaveStatus('No hay transacciones válidas para guardar');
+        return;
+      }
 
       const response = await fetch(`${API_URL}/bulk-transactions`, {
         method: 'POST',
@@ -175,8 +206,12 @@ export default function ContableApp() {
       const result = await response.json();
       setSaveStatus(`Transacciones guardadas: ${result.insertadas} de ${result.total_recibidas} (${result.duplicadas} duplicadas)`);
       
-      // Opcional: Recargar todas las transacciones para mostrar las recién guardadas
-      fetchTransactions();
+      // Opcional: Limpiar la tabla después de guardar exitosamente
+      if (result.insertadas > 0) {
+        setData([]);
+        setShowTable(false);
+        setBalance(null);
+      }
     } catch (err: any) {
       setSaveStatus(`Error: ${err.message}`);
     } finally {
@@ -195,8 +230,8 @@ export default function ContableApp() {
     });
   };
 
-  if (loading) return <div>Cargando datos...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (loading) return <div className="loading-container">Cargando datos...</div>;
+  if (error) return <div className="error-container">Error: {error}</div>;
 
   return (
     <div className="contable-app">
@@ -217,8 +252,8 @@ export default function ContableApp() {
                 <option value="" disabled>Cargando bancos...</option>
               ) : (
                 banks.map(bank => (
-                  <option key={bank.id} value={bank.id.toString()}>
-                    {bank.name}
+                  <option key={bank.id} value={bank.name.toString()}>
+                    {bank.description}
                   </option>
                 ))
               )}
@@ -254,51 +289,53 @@ export default function ContableApp() {
         </div>
       )}
       
-      <div className="transactions-header">
-        <h2>Transacciones</h2>
-        {data.length > 0 && (
-          <button 
-            onClick={handleSaveTransactions} 
-            disabled={savingTransactions}
-            className="save-button"
-          >
-            {savingTransactions ? 'Guardando...' : 'Guardar en Base de Datos'}
-          </button>
-        )}
-      </div>
-      
-      {saveStatus && (
-        <div className={`save-status ${saveStatus.includes('Error') ? 'error' : 'success'}`}>
-          {saveStatus}
-        </div>
+      {showTable && data.length > 0 && (
+        <>
+          <div className="transactions-header">
+            <h2>Transacciones</h2>
+            <button 
+              onClick={handleSaveTransactions} 
+              disabled={savingTransactions}
+              className="save-button"
+            >
+              {savingTransactions ? 'Guardando...' : 'Guardar en Base de Datos'}
+            </button>
+          </div>
+          
+          {saveStatus && (
+            <div className={`save-status ${saveStatus.includes('Error') ? 'error' : 'success'}`}>
+              {saveStatus}
+            </div>
+          )}
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Descripción</th>
+                <th>Monto</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item, index) => (
+                <tr key={index} className={item.Tipo?.toLowerCase() || ''}>
+                  <td>{item.Fecha || item.date}</td>
+                  <td>{item.Descripción || item.description}</td>
+                  <td>{formatAmount(item.Monto || item.amount || item.Cargo || item.Abono)}</td>
+                  <td>{item.Tipo || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
       
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Descripción</th>
-            <th>Cargo</th>
-            <th>Operación</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.length === 0 ? (
-            <tr>
-              <td colSpan={4}>No hay transacciones disponibles</td>
-            </tr>
-          ) : (
-            data.map((item, index) => (
-              <tr key={index}>
-                <td>{item.Fecha || item.date}</td>
-                <td>{item.Descripción || item.description}</td>
-                <td>{formatAmount(item.Cargo || item.amount)}</td>
-                <td>{item["N° Operación"] || "-"}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      {!showTable && !uploadStatus && (
+        <div className="info-message">
+          <p>Selecciona un banco y sube un archivo para procesar transacciones.</p>
+        </div>
+      )}
       
       <style>{`
         .upload-section {
@@ -425,6 +462,45 @@ export default function ContableApp() {
           border-radius: 8px;
           margin-bottom: 1.5rem;
           border-left: 4px solid #2196f3;
+        }
+        
+        tr.ingreso {
+          background-color: rgba(76, 175, 80, 0.1);
+        }
+        
+        tr.ingreso:hover {
+          background-color: rgba(76, 175, 80, 0.2);
+        }
+        
+        tr.gasto {
+          background-color: rgba(244, 67, 54, 0.05);
+        }
+        
+        tr.gasto:hover {
+          background-color: rgba(244, 67, 54, 0.1);
+        }
+
+        .loading-container, 
+        .error-container,
+        .info-message {
+          padding: 2rem;
+          text-align: center;
+          background-color: #f5f5f5;
+          border-radius: 8px;
+          margin-top: 1rem;
+        }
+
+        .error-container {
+          background-color: #ffebee;
+          color: #c62828;
+        }
+
+        .info-message {
+          background-color: #e3f2fd;
+          color: #1565c0;
+          padding: 2rem;
+          font-weight: 500;
+          border-left: 4px solid #1976d2;
         }
       `}</style>
     </div>

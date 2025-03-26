@@ -1,8 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import TransactionsList from '../components/TransactionsList';
 ---
 
-<Layout title="MoneyDairy - Gestión Financiera">
+<Layout title="MoneyDairy - Transacciones">
   <div class="dashboard">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
@@ -16,13 +17,13 @@ import Layout from '../layouts/Layout.astro';
       <nav class="sidebar-nav">
         <ul class="menu">
           <li class="menu-item">
-            <a href="/" class="menu-button active">
+            <a href="/" class="menu-button">
               <span class="menu-icon">📊</span>
               <span class="menu-text">Dashboard</span>
             </a>
           </li>
           <li class="menu-item">
-            <a href="/transacciones" class="menu-button">
+            <a href="/transacciones" class="menu-button active">
               <span class="menu-icon">📝</span>
               <span class="menu-text">Transacciones</span>
             </a>
@@ -31,18 +32,6 @@ import Layout from '../layouts/Layout.astro';
             <a href="/subir" class="menu-button">
               <span class="menu-icon">📤</span>
               <span class="menu-text">Subir Archivo</span>
-            </a>
-          </li>
-          <li class="menu-item">
-            <a href="/presupuestos" class="menu-button">
-              <span class="menu-icon">💰</span>
-              <span class="menu-text">Presupuestos</span>
-            </a>
-          </li>
-          <li class="menu-item">
-            <a href="/categorias" class="menu-button">
-              <span class="menu-icon">🏷️</span>
-              <span class="menu-text">Categorías</span>
             </a>
           </li>
         </ul>
@@ -56,52 +45,25 @@ import Layout from '../layouts/Layout.astro';
     <!-- Main Content -->
     <main class="main-content">
       <div class="content-wrapper">
-        <!-- Dashboard Section -->
-        <section id="dashboardSection" class="dashboard-section section-active">
-          <h2 class="section-title">Panel de Control</h2>
-          <div class="dashboard-grid">
-            <div class="upload-section-container" id="uploadSectionMini">
-              <div class="section-header">
-                <h3>Agregar Transacciones</h3>
-                <a href="/subir" class="view-more-btn">Ver más</a>
-              </div>
-              <p>Sube reportes bancarios o agrega transacciones manualmente.</p>
-            </div>
-            
-            <div class="transactions-section-container" id="transactionsSectionMini">
-              <div class="section-header">
-                <h3>Transacciones Recientes</h3>
-                <a href="/transacciones" class="view-more-btn">Ver todas</a>
-              </div>
-              <p>Gestiona y visualiza todas tus transacciones registradas.</p>
-            </div>
-            
-            <div class="budget-section-container" id="budgetSectionMini">
-              <div class="section-header">
-                <h3>Presupuestos</h3>
-                <a href="/presupuestos" class="view-more-btn">Gestionar</a>
-              </div>
-              <p>Crea y administra tus presupuestos por categorías.</p>
-            </div>
-          </div>
+        <!-- Transactions Section -->
+        <section class="transactions-section section-active">
+          <h2 class="section-title">Transacciones Registradas</h2>
+          <TransactionsList client:load />
         </section>
       </div>
     </main>
   </div>
 
   <script>
-    // Script para controlar la navegación entre secciones
+    // Script para controlar el sidebar en móvil
     document.addEventListener('DOMContentLoaded', () => {
-      // Referencias a elementos DOM
       const sidebar = document.getElementById('sidebar');
       const sidebarToggle = document.getElementById('sidebarToggle');
       
-      // Toggle sidebar en móvil
       sidebarToggle?.addEventListener('click', () => {
         sidebar?.classList.toggle('sidebar-collapsed');
       });
       
-      // Asegurar que el sidebar se colapse en móvil al cargar
       if (window.innerWidth < 768) {
         sidebar?.classList.add('sidebar-collapsed');
       }
@@ -233,73 +195,8 @@ import Layout from '../layouts/Layout.astro';
     padding-bottom: 0.5rem;
   }
   
-  /* Dashboard Grid */
-  .dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-  }
-  
-  .dashboard-section {
-    display: block;
-  }
-  
   .section-active {
     display: block;
-  }
-  
-  .upload-section-container,
-  .transactions-section-container,
-  .budget-section-container {
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    padding: 1.5rem;
-    transition: all 0.3s ease;
-    height: 100%;
-  }
-  
-  .upload-section-container:hover,
-  .transactions-section-container:hover,
-  .budget-section-container:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-  }
-  
-  .budget-section-container {
-    border-left: 4px solid #ff9800; /* Color distintivo para la sección de presupuestos */
-  }
-  
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-  
-  .section-header h3 {
-    font-size: 1.25rem;
-    margin: 0;
-    color: #333;
-  }
-  
-  .view-more-btn {
-    background-color: #4a66d8;
-    color: white;
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 0.875rem;
-    transition: background-color 0.2s;
-    text-decoration: none;
-    display: inline-block;
-  }
-  
-  .view-more-btn:hover {
-    background-color: #3a56c8;
   }
   
   /* Responsive Styles */

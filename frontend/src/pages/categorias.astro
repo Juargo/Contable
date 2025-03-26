@@ -1,0 +1,20 @@
+---
+import Layout from '../layouts/Layout.astro';
+import CategoryManagementPage from '../pages/CategoryManagementPage.jsx';
+import '../styles/categories.css';  // Importamos los estilos específicos
+import '../imports.js';  // Importamos Bootstrap CSS
+---
+
+<Layout title="MoneyDairy - Administración de Categorías">
+  <div class="categories-page">
+    <CategoryManagementPage client:load />
+  </div>
+</Layout>
+
+<style>
+  .categories-page {
+    width: 100%;
+    min-height: 100vh;
+    padding: 1rem;
+  }
+</style>

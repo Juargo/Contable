@@ -1,0 +1,36 @@
+/* Estilos para la administración de categorías */
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.cursor-pointer:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Animación para mensajes de éxito */
+.alert-success {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Estilos para las badges de tipo de categoría */
+.badge.bg-success {
+  font-weight: normal;
+  padding: 5px 10px;
+}
+
+.badge.bg-danger {
+  font-weight: normal;
+  padding: 5px 10px;
+}
+
+/* Estilos para los botones de acción */
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
