@@ -13,10 +13,10 @@ class Category(Base):
     color = Column(String(50), nullable=True)  # Para representación visual
     parent_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=True)
     
-    # Relación recursiva para subcategorías
+    # Corregir la relación recursiva para subcategorías
     subcategories = relationship(
-        "Category",
-        cascade="all, delete-orphan",
-        backref=ForeignKey("parent_id"),
-        remote_side=[id]
+        "Category", 
+        backref="parent",
+        remote_side=[id],
+        cascade="all"  # Eliminar "delete-orphan" de la cascada
     )

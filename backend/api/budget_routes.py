@@ -17,7 +17,7 @@ router = APIRouter(
 )
 
 # Endpoints para Presupuestos
-@router.post("/", response_model=BudgetResponse)
+@router.post("/budgets", response_model=BudgetResponse)
 def create_budget(budget: BudgetCreate, db: Session = Depends(get_db)):
     db_budget = Budget(
         name=budget.name,

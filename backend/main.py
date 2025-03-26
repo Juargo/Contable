@@ -13,11 +13,15 @@ from api.transactions import router as transactions_router
 from api.income_transactions import router as income_transactions_router
 from api.budget_routes import router as budget_router  # Importación absoluta
 from api.category_routes import router as category_router  # Importación absoluta
+from database import create_tables
 from database.connection import close_db, init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from config.cors import setup_cors
+
+# Crear tablas de SQLAlchemy al iniciar la aplicación
+create_tables()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
