@@ -50,12 +50,17 @@ register_tortoise(
     add_exception_handlers=True,
 )
 
-# Incluir routers
+# Incluir los routers
+# Necesitamos asegurarnos que las rutas específicas se registren antes que las rutas con parámetros
+# para evitar conflictos de interpretación
+
+# Si tienes un router para presupuestos que usa budget_id como parámetro de ruta,
+# debes modificar el prefijo para que no entre en conflicto con "/api/categorias"
+app.include_router(category_router, prefix="/api")
 app.include_router(transactions_router, prefix="/api")
 app.include_router(income_transactions_router, prefix="/api")
 app.include_router(banks_router, prefix="/api")
 app.include_router(budget_router, prefix="/api")
-app.include_router(category_router, prefix="/api")
 
 @app.get("/")
 async def read_root():

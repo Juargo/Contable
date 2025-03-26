@@ -15,7 +15,7 @@ from schemas.category_schema import (
 )
 
 router = APIRouter(
-    prefix="/categories",
+    prefix="/api/categories",  # Cambiado de "/api/categorias" a "/api/categories"
     tags=["categories"]
 )
 
@@ -25,7 +25,6 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     db_category = Category(
         name=category.name,
         description=category.description,
-        type=category.type,
         parent_id=None  # Asegurar que sea una categoría principal
     )
     db.add(db_category)
@@ -37,101 +36,15 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
 def get_categories(
     skip: int = 0, 
     limit: int = 100, 
-    type: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     query = db.query(Category).filter(Category.parent_id == None)  # Solo categorías principales
-    if type:
-        query = query.filter(Category.type == type)
     return query.offset(skip).limit(limit).all()
 
-@router.get("/{category_id}", response_model=CategoryResponse)
-def get_category(category_id: int, db: Session = Depends(get_db)):
-    category = db.query(Category).filter(Category.id == category_id, Category.parent_id == None).first()
-    if not category:
-        raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    return category
+# La ruta especial para subcategorías debería estar antes que la ruta con parámetros
+# para evitar conflictos de interpretación
 
-@router.put("/{category_id}", response_model=CategoryResponse)
-def update_category(category_id: int, category: CategoryUpdate, db: Session = Depends(get_db)):
-    db_category = db.query(Category).filter(Category.id == category_id, Category.parent_id == None).first()
-    if not db_category:
-        raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    
-    update_data = category.dict(exclude_unset=True)
-    # Asegurar que parent_id siga siendo None para categorías principales
-    if "parent_id" in update_data:
-        update_data.pop("parent_id")
-    
-    for key, value in update_data.items():
-        setattr(db_category, key, value)
-    
-    db.commit()
-    db.refresh(db_category)
-    return db_category
-
-@router.delete("/{category_id}", status_code=204)
-def delete_category(category_id: int, db: Session = Depends(get_db)):
-    # Primero verificar si hay subcategorías dependientes
-    subcategories = db.query(Category).filter(Category.parent_id == category_id).count()
-    if subcategories > 0:
-        raise HTTPException(
-            status_code=400, 
-            detail="No se puede eliminar una categoría con subcategorías. Elimine primero las subcategorías."
-        )
-    
-    db_category = db.query(Category).filter(Category.id == category_id, Category.parent_id == None).first()
-    if not db_category:
-        raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    
-    db.delete(db_category)
-    db.commit()
-    return {"message": "Categoría eliminada"}
-
-# Endpoints para Subcategorías
-@router.post("/{parent_id}/subcategories", response_model=SubcategoryResponse)
-def create_subcategory(parent_id: int, subcategory: SubcategoryCreate, db: Session = Depends(get_db)):
-    # Verificar si la categoría padre existe
-    parent = db.query(Category).filter(Category.id == parent_id, Category.parent_id == None).first()
-    if not parent:
-        raise HTTPException(status_code=404, detail="Categoría padre no encontrada")
-    
-    db_subcategory = Category(
-        name=subcategory.name,
-        description=subcategory.description,
-        type=parent.type,  # Heredar el tipo de la categoría padre
-        parent_id=parent_id
-    )
-    db.add(db_subcategory)
-    db.commit()
-    db.refresh(db_subcategory)
-    
-    # Enriquecer la respuesta con el nombre de la categoría padre
-    return {
-        **db_subcategory.__dict__,
-        "parent_name": parent.name
-    }
-
-@router.get("/{parent_id}/subcategories", response_model=List[SubcategoryResponse])
-def get_subcategories(
-    parent_id: int, 
-    skip: int = 0, 
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
-    # Verificar si la categoría padre existe
-    parent = db.query(Category).filter(Category.id == parent_id, Category.parent_id == None).first()
-    if not parent:
-        raise HTTPException(status_code=404, detail="Categoría padre no encontrada")
-    
-    subcategories = db.query(Category).filter(Category.parent_id == parent_id).offset(skip).limit(limit).all()
-    
-    # Enriquecer la respuesta con el nombre de la categoría padre
-    return [{
-        **subcategory.__dict__,
-        "parent_name": parent.name
-    } for subcategory in subcategories]
-
+# Reordenar las rutas para que las más específicas estén primero
 @router.get("/subcategory/{subcategory_id}", response_model=SubcategoryResponse)
 def get_subcategory(subcategory_id: int, db: Session = Depends(get_db)):
     subcategory = db.query(Category).filter(Category.id == subcategory_id).filter(Category.parent_id != None).first()
@@ -142,8 +55,13 @@ def get_subcategory(subcategory_id: int, db: Session = Depends(get_db)):
     parent = db.query(Category).filter(Category.id == subcategory.parent_id).first()
     
     return {
-        **subcategory.__dict__,
-        "parent_name": parent.name if parent else None
+        "id": subcategory.id,
+        "name": subcategory.name,
+        "description": subcategory.description,
+        "parent_id": subcategory.parent_id,
+        "parent_name": parent.name if parent else None,
+        "created_at": subcategory.created_at,
+        "updated_at": subcategory.updated_at
     }
 
 @router.put("/subcategory/{subcategory_id}", response_model=SubcategoryResponse)
@@ -165,8 +83,13 @@ def update_subcategory(subcategory_id: int, subcategory: SubcategoryUpdate, db: 
     parent = db.query(Category).filter(Category.id == db_subcategory.parent_id).first()
     
     return {
-        **db_subcategory.__dict__,
-        "parent_name": parent.name if parent else None
+        "id": db_subcategory.id,
+        "name": db_subcategory.name,
+        "description": db_subcategory.description,
+        "parent_id": db_subcategory.parent_id,
+        "parent_name": parent.name if parent else None,
+        "created_at": db_subcategory.created_at,
+        "updated_at": db_subcategory.updated_at
     }
 
 @router.delete("/subcategory/{subcategory_id}", status_code=204)
@@ -182,7 +105,6 @@ def delete_subcategory(subcategory_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Subcategoría eliminada"}
 
-# Endpoints para Palabras Clave de Categorías
 @router.post("/subcategory/{subcategory_id}/keywords", response_model=CategoryKeywordResponse)
 def add_category_keyword(subcategory_id: int, keyword: CategoryKeywordCreate, db: Session = Depends(get_db)):
     # Verificar si la subcategoría existe
@@ -271,3 +193,103 @@ def delete_category_keyword(keyword_id: int, db: Session = Depends(get_db)):
     
     db.commit()
     return {"message": "Palabra clave eliminada"}
+
+@router.get("/{category_id}", response_model=CategoryResponse)
+def get_category(category_id: int, db: Session = Depends(get_db)):
+    category = db.query(Category).filter(Category.id == category_id, Category.parent_id == None).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    return category
+
+@router.put("/{category_id}", response_model=CategoryResponse)
+def update_category(category_id: int, category: CategoryUpdate, db: Session = Depends(get_db)):
+    db_category = db.query(Category).filter(Category.id == category_id, Category.parent_id == None).first()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    update_data = category.dict(exclude_unset=True)
+    # Asegurar que parent_id siga siendo None para categorías principales
+    if "parent_id" in update_data:
+        update_data.pop("parent_id")
+    
+    for key, value in update_data.items():
+        setattr(db_category, key, value)
+    
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+@router.delete("/{category_id}", status_code=204)
+def delete_category(category_id: int, db: Session = Depends(get_db)):
+    # Primero verificar si hay subcategorías dependientes
+    subcategories = db.query(Category).filter(Category.parent_id == category_id).count()
+    if subcategories > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail="No se puede eliminar una categoría con subcategorías. Elimine primero las subcategorías."
+        )
+    
+    db_category = db.query(Category).filter(Category.id == category_id, Category.parent_id == None).first()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    db.delete(db_category)
+    db.commit()
+    return {"message": "Categoría eliminada"}
+
+# Endpoints para Subcategorías
+@router.post("/{parent_id}/subcategories", response_model=SubcategoryResponse)
+def create_subcategory(parent_id: int, subcategory: SubcategoryCreate, db: Session = Depends(get_db)):
+    # Verificar si la categoría padre existe
+    parent = db.query(Category).filter(Category.id == parent_id, Category.parent_id == None).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Categoría padre no encontrada")
+    
+    db_subcategory = Category(
+        name=subcategory.name,
+        description=subcategory.description,
+        parent_id=parent_id
+    )
+    db.add(db_subcategory)
+    db.commit()
+    db.refresh(db_subcategory)
+    
+    # Enriquecer la respuesta con el nombre de la categoría padre
+    response_dict = {
+        "id": db_subcategory.id,
+        "name": db_subcategory.name,
+        "description": db_subcategory.description,
+        "parent_id": db_subcategory.parent_id,
+        "parent_name": parent.name,
+        "created_at": db_subcategory.created_at,
+        "updated_at": db_subcategory.updated_at
+    }
+    return response_dict
+
+@router.get("/{parent_id}/subcategories", response_model=List[SubcategoryResponse])
+def get_subcategories(
+    parent_id: int, 
+    skip: int = 0, 
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    # Verificar si la categoría padre existe
+    parent = db.query(Category).filter(Category.id == parent_id, Category.parent_id == None).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Categoría padre no encontrada")
+    
+    subcategories = db.query(Category).filter(Category.parent_id == parent_id).offset(skip).limit(limit).all()
+    
+    # Enriquecer la respuesta con el nombre de la categoría padre
+    result = []
+    for subcategory in subcategories:
+        result.append({
+            "id": subcategory.id,
+            "name": subcategory.name,
+            "description": subcategory.description,
+            "parent_id": subcategory.parent_id,
+            "parent_name": parent.name,
+            "created_at": subcategory.created_at,
+            "updated_at": subcategory.updated_at
+        })
+    return result

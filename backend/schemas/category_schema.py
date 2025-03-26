@@ -6,7 +6,7 @@ from datetime import datetime
 class CategoryBase(BaseModel):
     name: str
     description: Optional[str] = None
-    type: str  # 'Ingreso' o 'Gasto'
+    # Se elimina el campo type ya que solo los gastos tendrán categorización
 
 class CategoryCreate(CategoryBase):
     pass
@@ -14,7 +14,7 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    type: Optional[str] = None
+    # Se elimina el campo type
 
 class CategoryResponse(CategoryBase):
     id: int
@@ -39,7 +39,7 @@ class SubcategoryResponse(SubcategoryBase):
     id: int
     parent_id: int
     parent_name: str
-    type: str
+    # También elimino el campo type de la respuesta de subcategorías
     created_at: datetime
     updated_at: Optional[datetime] = None
     
